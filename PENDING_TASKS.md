@@ -35,6 +35,7 @@ bin/migrate_levels.php  # Prefija con el nivel las filas antiguas planas (ej: 4A
 | Ruta | Descripcion |
 |---|---|
 | `GET /` | Indice de lecciones |
+| `GET /random` | Redirige a una leccion aleatoria |
 | `GET /lessons/{id}` | Detalle de la leccion (video, transcripcion, ejercicios, tutor) |
 | `GET /videos/{ruta}` | Streaming del video desde `paths.video_dir` (soporta HTTP Range) |
 | `POST /api/lessons/{id}/complete` | Marca la leccion como completada |
@@ -88,6 +89,7 @@ bin/migrate_levels.php  # Prefija con el nivel las filas antiguas planas (ej: 4A
   `lessons.file_name` y streaming por `VideoController`.
 - [x] Explicaciones y respuestas del tutor renderizadas como HTML (`Services/Markdown`).
 - [x] Streaming en vivo (`SyncController::live`).
+- [x] Boton "Leccion Aleatoria" en el indice (`GET /random`).
 
 ## Notas
 - Requiere PHP 8.0+ (usa `match`, tipos `mixed` y propiedades tipadas).

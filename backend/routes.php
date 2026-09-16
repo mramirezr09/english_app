@@ -13,6 +13,7 @@ use App\Core\Router;
 return static function (Router $router): void {
     $router->get('/', [HomeController::class, 'index']);
     $router->get('/index.php', [HomeController::class, 'index']);
+    $router->get('/random', [HomeController::class, 'random']);
 
     $router->get('/videos/{path...}', [VideoController::class, 'stream']);
     $router->head('/videos/{path...}', [VideoController::class, 'stream']);

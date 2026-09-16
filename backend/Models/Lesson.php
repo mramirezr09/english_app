@@ -29,6 +29,12 @@ final class Lesson extends Model
         return $stmt->fetch() ?: null;
     }
 
+    public function random(): ?array
+    {
+        $row = $this->db->query('SELECT * FROM lessons ORDER BY RANDOM() LIMIT 1')->fetch();
+        return $row ?: null;
+    }
+
     public function insertIfMissing(string $fileName, string $title): void
     {
         $stmt = $this->db->prepare('INSERT OR IGNORE INTO lessons (file_name, title) VALUES (?, ?)');

@@ -8,6 +8,7 @@
     <?php echo $stats['total']; ?>
 </p>
 <div style="text-align: center;">
+    <a href="/random" class="btn" style="background:#e67e22">&#127922; Lecci&oacute;n Aleatoria</a>
     <a href="/sync" class="btn">&#128260; Sincronizar Nuevos Videos</a>
     <a href="/settings" class="btn" style="background:#8e44ad">&#9881;&#65039; Ajustes</a>
 </div>

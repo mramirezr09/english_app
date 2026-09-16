@@ -18,4 +18,13 @@ final class HomeController extends Controller
             'stats'   => $lessons->stats(),
         ]);
     }
+
+    public function random(array $params = []): void
+    {
+        $lesson = (new Lesson())->random();
+        if ($lesson === null) {
+            $this->redirect('/');
+        }
+        $this->redirect('/lessons/' . (int) $lesson['id']);
+    }
 }
