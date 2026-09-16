@@ -1,0 +1,18 @@
+{
+    "backend": "ollama",
+    "paths": {
+        "video_dir": "/home/mauricio/.openclaw/workspace/ingles"
+    },
+    "ollama": {
+        "endpoint": "http://localhost:11434",
+        "model": "gemma4:31b-cloud",
+        "timeout": 300
+    },
+    "openclaw": {
+        "binary": "/home/mauricio/.openclaw/tmp/agent-cli/openclaw",
+        "timeout": 300
+    },
+    "whisper": {
+        "model": "base"
+    }
+}

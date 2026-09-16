@@ -1,0 +1,7 @@
+# Artifacts generated at runtime (audio, logs, whisper tests)
+/storage/tmp/*
+!/storage/tmp/.gitkeep
+
+# Python bytecode
+__pycache__/
+*.py[cod]

@@ -1,5 +1,0 @@
-{
-  "model": "ollama/gemma4:31b-cloud",
-  "endpoint": "http://localhost:11434/api/generate",
-  "timeout": 60
-}
