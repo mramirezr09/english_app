@@ -30,6 +30,10 @@ final class AiConfig
             'whisper' => [
                 'model' => 'base',
             ],
+            'exam' => [
+                'passing_score' => 80,
+                'questions'     => 12,
+            ],
         ];
     }
 
