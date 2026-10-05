@@ -15,7 +15,7 @@
     </div>
 
     <div class="video-container">
-        <video controls style="width: 100%; max-width: 800px;">
+        <video controls>
             <source src="/videos/<?php echo $video_url; ?>" type="video/mp4">
             Tu navegador no soporta videos.
         </video>
@@ -36,8 +36,8 @@
         <button class="btn" style="background:#8e44ad" onclick="startTutorChat()">Hablar con el Tutor</button>
         <div id="tutor-chat" style="display:none; margin-top:20px; border:1px solid #ddd; padding:15px; border-radius:10px; background:#fefefe;">
             <div id="chat-messages" style="height:200px; overflow-y:auto; margin-bottom:10px; display:flex; flex-direction:column; gap:10px;"></div>
-            <div style="display:flex; gap:10px;">
-                <input type="text" id="tutor-input" style="flex:1" placeholder="Escribe en ingles...">
+            <div class="chat-row">
+                <input type="text" id="tutor-input" placeholder="Escribe en ingles...">
                 <button class="btn" onclick="sendMessage()">Enviar</button>
             </div>
         </div>
