@@ -20,16 +20,14 @@
     <p style="margin-bottom:10px; color:#666;">
         Suelta los nuevos <strong>.mp4</strong> en la carpeta de videos y recarga esta pagina: se detectan automaticamente. El boton procesa solo lo pendiente.
     </p>
-    <p style="margin-bottom:20px;">
-        <label>Modelo Whisper:
-            <select id="whisper">
-                <?php foreach ($whisperModels as $w): ?>
-                    <option value="<?php echo $w; ?>" <?php echo $w === $config['whisper']['model'] ? 'selected' : ''; ?>><?php echo $w; ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-    </p>
-    <div style="display:flex; gap:10px; justify-content:center;">
+    <label class="field" style="text-align:left;">Modelo Whisper:
+        <select id="whisper" class="form-control">
+            <?php foreach ($whisperModels as $w): ?>
+                <option value="<?php echo $w; ?>" <?php echo $w === $config['whisper']['model'] ? 'selected' : ''; ?>><?php echo $w; ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+    <div class="actions">
         <button class="btn" style="background:#2ecc71" onclick="go('process')">Procesar Videos Pendientes</button>
         <a href="/sync" class="btn">Buscar Videos Nuevos</a>
         <a href="/" class="btn">Volver al Indice</a>
@@ -38,33 +36,35 @@
 </div>
 <div class="content-section">
     <h2 style="margin-bottom:20px;">Lista de Archivos</h2>
-    <table style="width:100%; border-collapse:collapse; margin-top:20px;">
-        <thead>
-            <tr style="background:#eee; text-align:left;">
-                <th style="padding:10px; border:1px solid #ddd;">Archivo</th>
-                <th style="padding:10px; border:1px solid #ddd;">Estado</th>
-                <th style="padding:10px; border:1px solid #ddd;">Procesar</th>
-                <th style="padding:10px; border:1px solid #ddd;">Gestion</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($lessons as $lesson): ?>
-            <tr>
-                <td style="padding:10px; border:1px solid #ddd;"><?php echo htmlspecialchars($lesson['file_name']); ?></td>
-                <td style="padding:10px; border:1px solid #ddd;">
-                    <?php echo !empty($lesson['transcription']) ? '&#9989; Transcrito' : '&#8987; Pendiente'; ?>
-                    <?php echo !empty($lesson['explanation']) ? ' / &#129302; IA' : ''; ?>
-                </td>
-                <td style="padding:10px; border:1px solid #ddd;">
-                    <button class="btn" style="padding:5px 10px; font-size:0.8em; background:#8e44ad;" onclick="live(<?php echo htmlspecialchars(json_encode($lesson['file_name']), ENT_QUOTES); ?>)">Procesar en Vivo</button>
-                </td>
-                <td style="padding:10px; border:1px solid #ddd;">
-                    <a href="/sync/re-enrich/<?php echo (int) $lesson['id']; ?>" class="btn" style="padding:5px 10px; font-size:0.8em; background:#2980b9;" onclick="return confirm('Regenerar explicacion y ejercicios con IA?')">Regenerar IA</a>
-                    <a href="/lessons/<?php echo (int) $lesson['id']; ?>/reset" class="btn" style="padding:5px 10px; font-size:0.8em; background:#e74c3c;" onclick="return confirm('Resetear esta leccion? Se borraran transcripcion, explicacion y ejercicios.')">Resetear</a>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Archivo</th>
+                    <th>Estado</th>
+                    <th>Procesar</th>
+                    <th>Gestion</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($lessons as $lesson): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($lesson['file_name']); ?></td>
+                    <td>
+                        <?php echo !empty($lesson['transcription']) ? '&#9989; Transcrito' : '&#8987; Pendiente'; ?>
+                        <?php echo !empty($lesson['explanation']) ? ' / &#129302; IA' : ''; ?>
+                    </td>
+                    <td>
+                        <button class="btn" style="padding:5px 10px; font-size:0.8em; background:#8e44ad;" onclick="live(<?php echo htmlspecialchars(json_encode($lesson['file_name']), ENT_QUOTES); ?>)">Procesar en Vivo</button>
+                    </td>
+                    <td>
+                        <a href="/sync/re-enrich/<?php echo (int) $lesson['id']; ?>" class="btn" style="padding:5px 10px; font-size:0.8em; background:#2980b9;" onclick="return confirm('Regenerar explicacion y ejercicios con IA?')">Regenerar IA</a>
+                        <a href="/lessons/<?php echo (int) $lesson['id']; ?>/reset" class="btn" style="padding:5px 10px; font-size:0.8em; background:#e74c3c;" onclick="return confirm('Resetear esta leccion? Se borraran transcripcion, explicacion y ejercicios.')">Resetear</a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 <script src="/assets/js/sync.js"></script>
