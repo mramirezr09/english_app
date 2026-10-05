@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Controllers\ExamController;
 use App\Controllers\HomeController;
 use App\Controllers\LessonController;
 use App\Controllers\SettingsController;
@@ -22,6 +23,12 @@ return static function (Router $router): void {
     $router->get('/lessons/{id}/reset', [LessonController::class, 'reset']);
     $router->post('/api/lessons/{id}/complete', [LessonController::class, 'complete']);
     $router->post('/api/tutor', [TutorController::class, 'message']);
+
+    $router->get('/exams', [ExamController::class, 'index']);
+    $router->get('/exams/new', [ExamController::class, 'take']);
+    $router->get('/exams/generate', [ExamController::class, 'generate']);
+    $router->get('/exams/results/{id}', [ExamController::class, 'results']);
+    $router->post('/api/exams/grade', [ExamController::class, 'grade']);
 
     $router->get('/sync', [SyncController::class, 'index']);
     $router->get('/sync/process', [SyncController::class, 'processAll']);
