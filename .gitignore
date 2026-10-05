@@ -1,3 +1,9 @@
+# Datos de runtime (SQLite + config local de IA)
+/data/*.db
+/data/*.db-journal
+/data/*.db-wal
+/config/ai_config.json
+
 # Artifacts generated at runtime (audio, logs, whisper tests)
 /storage/tmp/*
 !/storage/tmp/.gitkeep

@@ -1,7 +1,7 @@
 {
     "backend": "ollama",
     "paths": {
-        "video_dir": "/home/mauricio/.openclaw/workspace/ingles"
+        "video_dir": "/ruta/a/tus/videos"
     },
     "ollama": {
         "endpoint": "http://localhost:11434",
@@ -9,10 +9,14 @@
         "timeout": 300
     },
     "openclaw": {
-        "binary": "/home/mauricio/.openclaw/tmp/agent-cli/openclaw",
+        "binary": "/ruta/a/openclaw",
         "timeout": 300
     },
     "whisper": {
         "model": "base"
+    },
+    "exam": {
+        "passing_score": 80,
+        "questions": 12
     }
 }

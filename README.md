@@ -112,6 +112,10 @@ php bin/migrate_exams.php         # Base existente: agrega las tablas de examene
 Los tres scripts son idempotentes (`CREATE TABLE/INDEX IF NOT EXISTS`), por lo que
 pueden ejecutarse mas de una vez sin romper datos.
 
+> `data/lessons.db` y `config/ai_config.json` son **locales de cada entorno** y no se
+> versionan. La base se crea con `php bin/setup.php` y la config se guarda desde
+> `/settings`; hay una plantilla en `config/ai_config.example.json`.
+
 ## Despliegue
 
 - `start_server.sh` arranca el servidor embebido con `public/` como document root.
