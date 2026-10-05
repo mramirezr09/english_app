@@ -49,6 +49,8 @@ final class SettingsController extends Controller
         $cfg['openclaw']['binary'] = trim((string) Request::post('openclaw_binary', $cfg['openclaw']['binary']));
         $cfg['openclaw']['timeout'] = max(10, (int) Request::post('openclaw_timeout', $cfg['openclaw']['timeout']));
         $cfg['whisper']['model'] = trim((string) Request::post('whisper_model', $cfg['whisper']['model']));
+        $cfg['exam']['passing_score'] = min(100, max(1, (int) Request::post('exam_passing_score', $cfg['exam']['passing_score'] ?? 80)));
+        $cfg['exam']['questions'] = min(50, max(3, (int) Request::post('exam_questions', $cfg['exam']['questions'] ?? 12)));
 
         $this->redirect(AiConfig::save($cfg) ? '/settings?status=saved' : '/settings?error=save');
     }
