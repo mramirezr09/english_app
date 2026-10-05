@@ -12,6 +12,7 @@
         <span id="complete-status" class="<?php echo $lesson['completed'] ? 'success' : ''; ?>">
             <?php echo $lesson['completed'] ? '&#9989; Completada' : ''; ?>
         </span>
+        <a href="/exams/new?scope=lesson&amp;ref=<?php echo (int) $lesson['id']; ?>" class="btn" style="background:#c0392b">&#128221; Examen de esta lecci&oacute;n</a>
     </div>
 
     <div class="video-container">
