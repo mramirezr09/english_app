@@ -13,61 +13,51 @@
 
 <form method="post" action="/settings" class="content-section">
     <h2>Motor de IA</h2>
-    <p>
-        <label>Backend:
-            <select name="backend">
-                <option value="ollama" <?php echo $cfg['backend'] === 'ollama' ? 'selected' : ''; ?>>Ollama (local)</option>
-                <option value="openclaw" <?php echo $cfg['backend'] === 'openclaw' ? 'selected' : ''; ?>>OpenClaw CLI</option>
-            </select>
-        </label>
-    </p>
+    <label class="field">Backend:
+        <select name="backend" class="form-control">
+            <option value="ollama" <?php echo $cfg['backend'] === 'ollama' ? 'selected' : ''; ?>>Ollama (local)</option>
+            <option value="openclaw" <?php echo $cfg['backend'] === 'openclaw' ? 'selected' : ''; ?>>OpenClaw CLI</option>
+        </select>
+    </label>
 
     <h3>Ollama</h3>
-    <p>
-        <label>Endpoint: <input type="text" name="ollama_endpoint" value="<?php echo htmlspecialchars($cfg['ollama']['endpoint']); ?>" size="40"></label>
-    </p>
-    <p>
-        <label>Modelo:
-            <select name="ollama_model">
-                <?php if (!$models): ?><option value="<?php echo htmlspecialchars($currentModel); ?>"><?php echo htmlspecialchars($currentModel); ?></option><?php endif; ?>
-                <?php foreach ($models as $m): ?>
-                    <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $m === $currentModel ? 'selected' : ''; ?>><?php echo htmlspecialchars($m); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-    </p>
-    <p>
-        <label>Otro modelo (opcional, tiene prioridad):
-            <input type="text" name="ollama_model_custom" placeholder="ej: gemma4:31b-cloud" size="30">
-        </label>
-    </p>
-    <p><label>Timeout (s): <input type="number" name="ollama_timeout" value="<?php echo (int) $cfg['ollama']['timeout']; ?>" min="10"></label></p>
+    <label class="field">Endpoint: <input type="text" name="ollama_endpoint" class="form-control" value="<?php echo htmlspecialchars($cfg['ollama']['endpoint']); ?>"></label>
+    <label class="field">Modelo:
+        <select name="ollama_model" class="form-control">
+            <?php if (!$models): ?><option value="<?php echo htmlspecialchars($currentModel); ?>"><?php echo htmlspecialchars($currentModel); ?></option><?php endif; ?>
+            <?php foreach ($models as $m): ?>
+                <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $m === $currentModel ? 'selected' : ''; ?>><?php echo htmlspecialchars($m); ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+    <label class="field">Otro modelo (opcional, tiene prioridad):
+        <input type="text" name="ollama_model_custom" class="form-control" placeholder="ej: gemma4:31b-cloud">
+    </label>
+    <label class="field">Timeout (s): <input type="number" name="ollama_timeout" class="form-control" value="<?php echo (int) $cfg['ollama']['timeout']; ?>" min="10"></label>
 
     <h3>OpenClaw</h3>
-    <p><label>Binario: <input type="text" name="openclaw_binary" value="<?php echo htmlspecialchars($cfg['openclaw']['binary']); ?>" size="55"></label></p>
-    <p><label>Timeout (s): <input type="number" name="openclaw_timeout" value="<?php echo (int) $cfg['openclaw']['timeout']; ?>" min="10"></label></p>
+    <label class="field">Binario: <input type="text" name="openclaw_binary" class="form-control" value="<?php echo htmlspecialchars($cfg['openclaw']['binary']); ?>"></label>
+    <label class="field">Timeout (s): <input type="number" name="openclaw_timeout" class="form-control" value="<?php echo (int) $cfg['openclaw']['timeout']; ?>" min="10"></label>
 
     <h3>Whisper</h3>
-    <p>
-        <label>Modelo:
-            <select name="whisper_model">
-                <?php foreach ($whisperModels as $w): ?>
-                    <option value="<?php echo $w; ?>" <?php echo $w === $cfg['whisper']['model'] ? 'selected' : ''; ?>><?php echo $w; ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-    </p>
+    <label class="field">Modelo:
+        <select name="whisper_model" class="form-control">
+            <?php foreach ($whisperModels as $w): ?>
+                <option value="<?php echo $w; ?>" <?php echo $w === $cfg['whisper']['model'] ? 'selected' : ''; ?>><?php echo $w; ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
 
     <button type="submit" class="btn">Guardar</button>
 </form>
 
 <div class="content-section">
     <h2>Pruebas</h2>
-    <p>
+    <div class="actions">
         <button class="btn" type="button" onclick="refreshModels()">Listar modelos Ollama</button>
         <button class="btn" style="background:#8e44ad" type="button" onclick="testAi()">Probar IA</button>
         <button class="btn" style="background:#16a085" type="button" onclick="testWhisper()">Probar Whisper</button>
-    </p>
+    </div>
     <pre id="result" style="background:#f4f4f4; padding:15px; border-radius:8px; white-space:pre-wrap; min-height:60px;">Sin resultados todavia.</pre>
 </div>
 <script src="/assets/js/settings.js"></script>
