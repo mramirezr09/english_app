@@ -179,6 +179,30 @@ input[type="text"], input[type="number"], select, textarea {
 .markdown th { background: #f4f4f4; }
 .markdown a { color: #3498db; }
 
+.exam-question {
+    border-bottom: 1px solid #eee;
+    padding: 14px 0;
+}
+.exam-question:last-child { border-bottom: none; }
+.exam-prompt { line-height: 1.5; margin: 0 0 10px; }
+.exam-options { display: flex; flex-direction: column; gap: 8px; }
+.exam-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #e2e8ec;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.exam-option:hover { border-color: #3498db; background: #f7fbff; }
+.exam-hint { color: #666; margin: 0 0 8px; }
+.exam-score { font-size: 2.2em; font-weight: bold; margin: 0; }
+.exam-question.ok { border-left: 4px solid #2ecc71; padding-left: 12px; }
+.exam-question.ko { border-left: 4px solid #e74c3c; padding-left: 12px; }
+.exam-feedback { color: #555; font-style: italic; }
+textarea.form-control { resize: vertical; min-height: 70px; }
+
 @media (max-width: 640px) {
     body { padding: 12px; }
     h1 { font-size: 1.5em; }
