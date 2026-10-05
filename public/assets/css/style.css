@@ -202,6 +202,33 @@ input[type="text"], input[type="number"], select, textarea {
 .exam-question.ko { border-left: 4px solid #e74c3c; padding-left: 12px; }
 .exam-feedback { color: #555; font-style: italic; }
 textarea.form-control { resize: vertical; min-height: 70px; }
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.badge.running { background: #fef3c7; color: #92400e; }
+.badge.done { background: #dcfce7; color: #166534; }
+.badge.error { background: #fee2e2; color: #991b1b; }
+.badge.none { background: #f1f5f9; color: #475569; }
+.log-entry { border-bottom: 1px solid #eee; padding: 8px 0; }
+.log-entry summary { cursor: pointer; }
+.log-entry small { color: #999; margin-left: 6px; }
+.log-tail {
+    background: #1e1e1e;
+    color: #eee;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    white-space: pre-wrap;
+    max-height: 220px;
+    overflow: auto;
+    margin: 8px 0;
+}
 
 @media (max-width: 640px) {
     body { padding: 12px; }

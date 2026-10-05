@@ -13,9 +13,10 @@ final class Whisper
 {
     public static function test(string $model): array
     {
+        $python = escapeshellarg(AiConfig::pythonBinary());
         $script = escapeshellarg(Config::worker('whisper_test.py'));
         $modelArg = escapeshellarg($model);
-        $output = shell_exec("python3 $script $modelArg 2>&1");
+        $output = shell_exec("$python $script $modelArg 2>&1");
         $data = json_decode((string) $output, true);
 
         if (!is_array($data)) {

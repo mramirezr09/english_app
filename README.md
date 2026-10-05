@@ -95,9 +95,13 @@ bin/migrate_exams.php         # Crea las tablas de examenes en bases existentes
 
 - `/settings`: backend de IA (Ollama / OpenClaw), modelo Ollama (lista dinamica + campo
   libre para modelos *cloud* como `gemma4:31b-cloud`), modelo Whisper, timeouts y botones de prueba.
-- `config/ai_config.json`: persistencia de esos ajustes, incluida la seccion `exam`:
+- `config/ai_config.json`: persistencia de esos ajustes. Secciones relevantes:
+  - `paths.video_dir`: carpeta raiz de los videos (con subcarpetas por nivel).
+  - `paths.python`: interprete usado por los workers Python (default `python3`).
   - `exam.passing_score` (default 80): puntaje minimo para aprobar.
   - `exam.questions` (default 12): cantidad de preguntas por examen.
+- Los procesos de IA/Whisper corren en segundo plano y dejan su salida en
+  `storage/tmp/*.log`; `/exams` y `/sync` muestran el estado y el log de cada uno.
 - Por defecto se usa `gemma4:31b-cloud`: corre en los servidores de Ollama (suscripcion),
   asi que es rapido y no carga la CPU local (este equipo no tiene GPU).
 

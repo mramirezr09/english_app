@@ -55,13 +55,29 @@ $scopeLabel = static function (array $attempt): string {
     <div class="table-wrap">
         <table class="table">
             <thead>
-                <tr><th>Leccion</th><th>Preguntas</th><th>Acciones</th></tr>
+                <tr><th>Leccion</th><th>Preguntas</th><th>Generacion</th><th>Acciones</th></tr>
             </thead>
             <tbody>
                 <?php foreach ($lessons as $lesson): ?>
+                    <?php $gen = $lesson['gen']; ?>
                     <tr>
                         <td><?php echo htmlspecialchars((string) $lesson['title']); ?></td>
                         <td><?php echo (int) $lesson['question_count']; ?></td>
+                        <td>
+                            <?php if ($gen['state'] === 'running'): ?>
+                                <span class="badge running">generando...</span>
+                            <?php elseif ($gen['state'] === 'error'): ?>
+                                <span class="badge error">error</span>
+                                <details>
+                                    <summary>ver log</summary>
+                                    <pre class="log-tail"><?php echo htmlspecialchars((string) $gen['tail']); ?></pre>
+                                </details>
+                            <?php elseif ($gen['state'] === 'done'): ?>
+                                <span class="badge done">listo</span>
+                            <?php else: ?>
+                                <span class="badge none">-</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php if ((int) $lesson['question_count'] > 0): ?>
                                 <a href="/exams/new?scope=lesson&amp;ref=<?php echo (int) $lesson['id']; ?>" class="btn" style="padding:5px 10px; font-size:0.8em; background:#2980b9;">Rendir</a>
@@ -75,6 +91,25 @@ $scopeLabel = static function (array $attempt): string {
             </tbody>
         </table>
     </div>
+</div>
+
+<div class="content-section">
+    <h2>Procesos recientes</h2>
+    <?php if ($logs): ?>
+        <?php foreach ($logs as $logEntry): ?>
+            <details class="log-entry" <?php echo $logEntry['state'] === 'error' ? 'open' : ''; ?>>
+                <summary>
+                    <span class="badge <?php echo htmlspecialchars((string) $logEntry['state']); ?>"><?php echo htmlspecialchars((string) $logEntry['state']); ?></span>
+                    <?php echo htmlspecialchars((string) $logEntry['name']); ?>
+                    <small><?php echo htmlspecialchars((string) $logEntry['modified']); ?></small>
+                </summary>
+                <pre class="log-tail"><?php echo htmlspecialchars((string) $logEntry['tail']); ?></pre>
+                <a href="/exams/log?name=<?php echo urlencode((string) $logEntry['name']); ?>" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em;">Ver log completo</a>
+            </details>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <p>Sin procesos registrados todavia.</p>
+    <?php endif; ?>
 </div>
 
 <div class="content-section">

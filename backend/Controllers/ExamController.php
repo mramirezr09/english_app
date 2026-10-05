@@ -6,12 +6,14 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Request;
+use App\Core\Response;
 use App\Models\Exam;
 use App\Models\Lesson;
 use App\Services\AiConfig;
 use App\Services\ExamBuilder;
 use App\Services\ExamGrader;
 use App\Services\ExamProcessor;
+use App\Services\ProcessRunner;
 
 final class ExamController extends Controller
 {
@@ -23,6 +25,7 @@ final class ExamController extends Controller
         $lessons = [];
         foreach ((new Lesson())->all() as $row) {
             $row['question_count'] = $counts[(int) $row['id']] ?? 0;
+            $row['gen'] = ProcessRunner::status($this->lessonLogName((int) $row['id']));
             $lessons[] = $row;
         }
 
@@ -34,6 +37,7 @@ final class ExamController extends Controller
             'attempts'       => $exam->recentAttempts(15),
             'attemptStats'   => $exam->attemptStats(),
             'passingScore'   => $this->passingScore(),
+            'logs'           => ProcessRunner::recentLogs(8),
             'status'         => $this->statusMessage((string) Request::query('status', '')),
         ]);
     }
@@ -150,6 +154,16 @@ final class ExamController extends Controller
 
     public function generate(array $params = []): void
     {
+        if (!ProcessRunner::canRunShell()) {
+            $this->redirect('/exams?status=shell_disabled');
+        }
+        if (!ProcessRunner::logDirWritable()) {
+            $this->redirect('/exams?status=log_unwritable');
+        }
+        if (ProcessRunner::resolveBinary(AiConfig::pythonBinary()) === null) {
+            $this->redirect('/exams?status=python_missing');
+        }
+
         $scope = (string) Request::query('scope', 'all');
         $ref = Request::query('ref');
         $force = Request::query('force') === '1';
@@ -162,6 +176,16 @@ final class ExamController extends Controller
         }
 
         $this->redirect('/exams?status=generating');
+    }
+
+    public function log(array $params = []): void
+    {
+        $name = (string) Request::query('name', '');
+        if ($name === '') {
+            $this->redirect('/exams');
+        }
+        $content = ProcessRunner::readLog($name, 300);
+        Response::text($content !== '' ? $content : 'Sin registros para "' . $name . '".');
     }
 
     private function heading(string $scope, ?string $ref): string
@@ -181,13 +205,21 @@ final class ExamController extends Controller
         return (int) (AiConfig::load()['exam']['passing_score'] ?? 80);
     }
 
+    private function lessonLogName(int $id): string
+    {
+        return 'exam_generate_' . $id;
+    }
+
     private function statusMessage(string $status): string
     {
         return match ($status) {
-            'generating'  => 'Generando preguntas con IA en segundo plano. Recarga la pagina en unos minutos.',
-            'no_questions' => 'No hay preguntas disponibles para ese examen. Genera preguntas primero.',
-            'missing_ref' => 'Datos de examen incompletos. Elige una leccion o nivel.',
-            default       => '',
+            'generating'     => 'Generando preguntas con IA en segundo plano. Recarga la pagina en unos minutos.',
+            'no_questions'   => 'No hay preguntas disponibles para ese examen. Genera preguntas primero.',
+            'missing_ref'    => 'Datos de examen incompletos. Elige una leccion o nivel.',
+            'shell_disabled' => 'El servidor PHP tiene deshabilitado shell_exec; no se pueden lanzar los workers.',
+            'log_unwritable' => 'No se puede escribir en storage/tmp. Revisa los permisos del usuario del servicio.',
+            'python_missing' => 'No se encontro el interprete de Python configurado (paths.python en ai_config.json).',
+            default          => '',
         };
     }
 }

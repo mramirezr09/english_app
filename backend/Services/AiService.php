@@ -20,7 +20,7 @@ final class AiService
             2 => ['pipe', 'w'],
         ];
 
-        $process = proc_open(['python3', $script], $descriptors, $pipes);
+        $process = proc_open([AiConfig::pythonBinary(), $script], $descriptors, $pipes);
         if (!is_resource($process)) {
             return null;
         }

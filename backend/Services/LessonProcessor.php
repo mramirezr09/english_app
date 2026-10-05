@@ -13,24 +13,26 @@ final class LessonProcessor
 {
     public function processAll(string $whisper): void
     {
-        $script = escapeshellarg(Config::worker('process_lessons.py'));
-        $arg = '--whisper-model ' . escapeshellarg($whisper);
-        shell_exec('PYTHONUNBUFFERED=1 python3 ' . $script . " $arg > /dev/null 2>&1 &");
+        ProcessRunner::background(
+            [AiConfig::pythonBinary(), Config::worker('process_lessons.py'), '--whisper-model', $whisper],
+            'process_lessons_all'
+        );
     }
 
     public function processOne(string $file, string $whisper): void
     {
-        $script = escapeshellarg(Config::worker('process_lessons.py'));
-        $fileArg = escapeshellarg($file);
-        $whisperArg = '--whisper-model ' . escapeshellarg($whisper);
-        shell_exec('PYTHONUNBUFFERED=1 python3 ' . $script . " $fileArg $whisperArg > /dev/null 2>&1 &");
+        ProcessRunner::background(
+            [AiConfig::pythonBinary(), Config::worker('process_lessons.py'), $file, '--whisper-model', $whisper],
+            'process_lesson_' . md5($file)
+        );
     }
 
     public function reEnrich(int|string $id): void
     {
-        $script = escapeshellarg(Config::worker('enrich_lesson.py'));
-        $idArg = escapeshellarg((string) $id);
-        shell_exec("python3 $script $idArg --force > /dev/null 2>&1 &");
+        ProcessRunner::background(
+            [AiConfig::pythonBinary(), Config::worker('enrich_lesson.py'), (string) $id, '--force'],
+            'enrich_' . (int) $id
+        );
     }
 
     /**
@@ -44,7 +46,8 @@ final class LessonProcessor
         @unlink($logFile);
 
         $script = escapeshellarg(Config::worker('process_lessons.py'));
-        $cmd = 'PYTHONUNBUFFERED=1 python3 ' . $script
+        $python = escapeshellarg(AiConfig::pythonBinary());
+        $cmd = 'PYTHONUNBUFFERED=1 ' . $python . ' ' . $script
              . ' ' . escapeshellarg($file)
              . ' --whisper-model ' . escapeshellarg($whisper)
              . ' --force'

@@ -1,7 +1,8 @@
 {
     "backend": "ollama",
     "paths": {
-        "video_dir": "/ruta/a/tus/videos"
+        "video_dir": "/ruta/a/tus/videos",
+        "python": "python3"
     },
     "ollama": {
         "endpoint": "http://localhost:11434",

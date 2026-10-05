@@ -27,6 +27,7 @@ return static function (Router $router): void {
     $router->get('/exams', [ExamController::class, 'index']);
     $router->get('/exams/new', [ExamController::class, 'take']);
     $router->get('/exams/generate', [ExamController::class, 'generate']);
+    $router->get('/exams/log', [ExamController::class, 'log']);
     $router->get('/exams/results/{id}', [ExamController::class, 'results']);
     $router->post('/api/exams/grade', [ExamController::class, 'grade']);
 

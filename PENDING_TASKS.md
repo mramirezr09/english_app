@@ -29,6 +29,10 @@ Documentacion del proyecto en `README.md`. Aca se registra lo implementado y lo 
   instalacion en `bin/setup.php`.
 - [x] Ajustes de examen en `/settings` (umbral de aprobacion y cantidad de preguntas).
 - [x] Frontend responsive (meta viewport, grid fluido, tablas con scroll, botones que envuelven).
+- [x] Workers de IA/Whisper en segundo plano con log y PID (`Services/ProcessRunner`),
+  interprete configurable (`paths.python`) y estado/errores visibles en `/exams` y `/sync`.
+- [x] Datos de runtime desversionados: `data/lessons.db` y `config/ai_config.json` ya no
+  estan en git (plantilla en `config/ai_config.example.json`).
 
 ## Pendiente
 

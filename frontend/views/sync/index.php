@@ -4,6 +4,7 @@
 /** @var array $config */
 /** @var string[] $whisperModels */
 /** @var string|null $status */
+/** @var array $logs */
 ?>
 <h1>&#9881;&#65039; Panel de Sincronizacion</h1>
 <div class="content-section" style="text-align: center;">
@@ -66,5 +67,23 @@
             </tbody>
         </table>
     </div>
+</div>
+<div class="content-section">
+    <h2>Registro de procesos</h2>
+    <?php if ($logs): ?>
+        <?php foreach ($logs as $logEntry): ?>
+            <details class="log-entry" <?php echo $logEntry['state'] === 'error' ? 'open' : ''; ?>>
+                <summary>
+                    <span class="badge <?php echo htmlspecialchars((string) $logEntry['state']); ?>"><?php echo htmlspecialchars((string) $logEntry['state']); ?></span>
+                    <?php echo htmlspecialchars((string) $logEntry['name']); ?>
+                    <small><?php echo htmlspecialchars((string) $logEntry['modified']); ?></small>
+                </summary>
+                <pre class="log-tail"><?php echo htmlspecialchars((string) $logEntry['tail']); ?></pre>
+                <a href="/exams/log?name=<?php echo urlencode((string) $logEntry['name']); ?>" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em;">Ver log completo</a>
+            </details>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <p>Sin procesos registrados todavia.</p>
+    <?php endif; ?>
 </div>
 <script src="/assets/js/sync.js"></script>

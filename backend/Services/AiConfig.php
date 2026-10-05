@@ -17,6 +17,7 @@ final class AiConfig
             'backend' => 'ollama',
             'paths'   => [
                 'video_dir' => '/home/mauricio/.openclaw/workspace/ingles',
+                'python'    => 'python3',
             ],
             'ollama'  => [
                 'endpoint' => 'http://localhost:11434',
@@ -61,5 +62,15 @@ final class AiConfig
     {
         $cfg = self::load();
         return rtrim((string) ($cfg['paths']['video_dir'] ?? ''), '/');
+    }
+
+    /**
+     * Interpreter used for the Python workers. Configurable via paths.python.
+     */
+    public static function pythonBinary(): string
+    {
+        $cfg = self::load();
+        $binary = trim((string) ($cfg['paths']['python'] ?? ''));
+        return $binary !== '' ? $binary : 'python3';
     }
 }

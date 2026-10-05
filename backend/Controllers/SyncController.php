@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Models\Lesson;
 use App\Services\AiConfig;
 use App\Services\LessonProcessor;
+use App\Services\ProcessRunner;
 
 final class SyncController extends Controller
 {
@@ -30,6 +31,7 @@ final class SyncController extends Controller
             'stats'         => $model->stats(),
             'config'        => AiConfig::load(),
             'whisperModels' => Config::WHISPER_MODELS,
+            'logs'          => ProcessRunner::recentLogs(8),
             'status'        => $this->statusMessage((string) Request::query('status', '')),
         ]);
     }
