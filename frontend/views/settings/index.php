@@ -48,6 +48,14 @@
         </select>
     </label>
 
+    <h3>Examenes</h3>
+    <label class="field">Preguntas por examen:
+        <input type="number" name="exam_questions" class="form-control" min="3" max="50" value="<?php echo (int) ($cfg['exam']['questions'] ?? 12); ?>">
+    </label>
+    <label class="field">Puntaje minimo para aprobar (%):
+        <input type="number" name="exam_passing_score" class="form-control" min="1" max="100" value="<?php echo (int) ($cfg['exam']['passing_score'] ?? 80); ?>">
+    </label>
+
     <button type="submit" class="btn">Guardar</button>
 </form>
 
