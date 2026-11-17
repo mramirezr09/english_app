@@ -4,12 +4,19 @@
 /data/*.db-wal
 /config/ai_config.json
 
+# Secretos locales (.env)
+/.env
+
+# Binarios y modelos descargados
+/storage/bin/*
+/storage/models/*
+/storage/runtime/*
+!/storage/bin/.gitkeep
+!/storage/models/.gitkeep
+!/storage/runtime/.gitkeep
+
 # Artifacts generated at runtime (audio, logs, whisper tests)
 /storage/tmp/*
 !/storage/tmp/.gitkeep
-
-# Python bytecode
-__pycache__/
-*.py[cod]
 
 .vscode/
