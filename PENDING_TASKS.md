@@ -45,7 +45,11 @@ Documentacion del proyecto en `README.md`. Aca se registra lo implementado y lo 
 - [x] Limpieza de locks de workers en Windows (PID 0) cuando el log deja de cambiar.
 - [x] Datos de runtime desversionados: `data/lessons.db`, `config/ai_config.json`, `.env`,
       `storage/bin`, `storage/models` y `storage/runtime` ya no estan en git.
-- [x] Eliminado el backend Python/Ollama/OpenClaw: toda la IA y la transcripcion son nativas.
+- [x] Motor de Whisper seleccionable: `auto`, `whisper.cpp` nativo u
+      `openai-whisper` (Python) para reutilizar instalaciones existentes.
+- [x] Eliminado el backend Python/Ollama/OpenClaw del flujo principal: la IA es
+      nativa y la transcripcion usa whisper.cpp; openai-whisper queda como
+      fallback opcional configurable.
 
 ## Pendiente
 
@@ -55,6 +59,8 @@ Documentacion del proyecto en `README.md`. Aca se registra lo implementado y lo 
       HTML: `frontend/views/lessons/show.php` y `public/assets/js/lesson.js`).
 - [ ] Validar el despliegue completo en Ubuntu (ffmpeg + whisper.cpp + OpenCode + permisos
       de `www-data`) y medir tiempos reales por video.
+- [ ] Una vez validado whisper.cpp en Ubuntu, cambiar `whisper.engine` a `whisper_cpp`
+      y retirar el fallback de Python si ya no se usa.
 - [ ] Limpieza de `storage/tmp` y de intentos `exam_attempts` con estado `in_progress` huerfanos.
 - [ ] Opcional: modo de inferencia directa por HTTP (`/inference/go`) para reducir la
       latencia del tutor frente al CLI.
