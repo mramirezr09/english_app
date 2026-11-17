@@ -39,7 +39,7 @@ final class ProcessRunner
             return 0;
         }
 
-        $full = 'PYTHONUNBUFFERED=1 nohup ' . $cmd
+        $full = 'nohup ' . $cmd
               . ' > ' . escapeshellarg($log) . ' 2>&1 & echo $!';
         $pid = (int) trim((string) shell_exec($full));
 
@@ -70,6 +70,11 @@ final class ProcessRunner
         }
 
         if (!$running && $pid > 0 && is_file($lock)) {
+            @unlink($lock);
+        }
+        // Windows workers are started with `start /B` and do not expose a PID;
+        // once the log has been idle for a while the lock is no longer useful.
+        if ($pid === 0 && is_file($lock) && is_file($log) && (time() - (int) filemtime($log)) > 300) {
             @unlink($lock);
         }
 
@@ -174,7 +179,7 @@ final class ProcessRunner
     private static function looksLikeError(string $text): bool
     {
         return $text !== '' && preg_match(
-            '/(error|traceback|no se pud|no pud|fallo|exception|no such file|not recognized|command not found)/i',
+            '/(fatal error|parse error|traceback|uncaught|\berror\b|no se pud|no pud|fallo|exception|no such file|not recognized|command not found)/i',
             $text
         ) === 1;
     }
