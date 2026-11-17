@@ -13,6 +13,7 @@ use App\Services\AiConfig;
 use App\Services\ExamBuilder;
 use App\Services\ExamGrader;
 use App\Services\ExamProcessor;
+use App\Services\OpenCode;
 use App\Services\ProcessRunner;
 
 final class ExamController extends Controller
@@ -160,8 +161,14 @@ final class ExamController extends Controller
         if (!ProcessRunner::logDirWritable()) {
             $this->redirect('/exams?status=log_unwritable');
         }
-        if (ProcessRunner::resolveBinary(AiConfig::pythonBinary()) === null) {
-            $this->redirect('/exams?status=python_missing');
+        if (ProcessRunner::resolveBinary(AiConfig::phpBinary()) === null) {
+            $this->redirect('/exams?status=worker_missing');
+        }
+        if (OpenCode::binary() === null) {
+            $this->redirect('/exams?status=opencode_missing');
+        }
+        if (OpenCode::apiKey() === '' && !OpenCode::isFreeModel(OpenCode::model())) {
+            $this->redirect('/exams?status=opencode_key_missing');
         }
 
         $scope = (string) Request::query('scope', 'all');
@@ -213,13 +220,15 @@ final class ExamController extends Controller
     private function statusMessage(string $status): string
     {
         return match ($status) {
-            'generating'     => 'Generando preguntas con IA en segundo plano. Recarga la pagina en unos minutos.',
-            'no_questions'   => 'No hay preguntas disponibles para ese examen. Genera preguntas primero.',
-            'missing_ref'    => 'Datos de examen incompletos. Elige una leccion o nivel.',
-            'shell_disabled' => 'El servidor PHP tiene deshabilitado shell_exec; no se pueden lanzar los workers.',
-            'log_unwritable' => 'No se puede escribir en storage/tmp. Revisa los permisos del usuario del servicio.',
-            'python_missing' => 'No se encontro el interprete de Python configurado (paths.python en ai_config.json).',
-            default          => '',
+            'generating'          => 'Generando preguntas con IA en segundo plano. Recarga la pagina en unos minutos.',
+            'no_questions'        => 'No hay preguntas disponibles para ese examen. Genera preguntas primero.',
+            'missing_ref'         => 'Datos de examen incompletos. Elige una leccion o nivel.',
+            'shell_disabled'      => 'El servidor PHP tiene deshabilitado shell_exec; no se pueden lanzar los workers.',
+            'log_unwritable'      => 'No se puede escribir en storage/tmp. Revisa los permisos del usuario del servicio.',
+            'worker_missing'      => 'No se encontro el binario de PHP configurado (paths.php en ai_config.json).',
+            'opencode_missing'    => 'No se encontro el CLI de OpenCode. Configura la ruta en /settings o en OPENCODE_BIN.',
+            'opencode_key_missing' => 'Falta OPENCODE_API_KEY para el modelo seleccionado. Configurala en /settings.',
+            default               => '',
         };
     }
 }
