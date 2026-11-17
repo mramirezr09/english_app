@@ -56,6 +56,46 @@ final class Exam extends Model
         return (int) $stmt->fetchColumn();
     }
 
+    /**
+     * Replace the AI-generated questions for a lesson.
+     *
+     * @param array<int, array{type:string, prompt:string, options:array<int,string>, answer:string, alt:array<int,string>, explanation:string, difficulty:int}> $questions
+     */
+    public function replaceAiQuestions(int $lessonId, ?string $level, array $questions): void
+    {
+        $this->db->beginTransaction();
+        try {
+            $delete = $this->db->prepare("DELETE FROM exam_questions WHERE lesson_id = ? AND source = 'ai'");
+            $delete->execute([$lessonId]);
+
+            $insert = $this->db->prepare(
+                'INSERT INTO exam_questions '
+                . '(lesson_id, level, type, prompt, options, answer, alt_answers, explanation, difficulty, source, created_at) '
+                . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $now = date('Y-m-d H:i:s');
+            foreach ($questions as $question) {
+                $insert->execute([
+                    $lessonId,
+                    $level,
+                    $question['type'],
+                    $question['prompt'],
+                    $question['options'] !== [] ? json_encode($question['options'], JSON_UNESCAPED_UNICODE) : null,
+                    $question['answer'],
+                    $question['alt'] !== [] ? json_encode($question['alt'], JSON_UNESCAPED_UNICODE) : null,
+                    $question['explanation'],
+                    $question['difficulty'],
+                    'ai',
+                    $now,
+                ]);
+            }
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
     public function countForLevel(string $level): int
     {
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM exam_questions WHERE level = ?');
