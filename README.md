@@ -7,14 +7,15 @@ leccion. Incluye una seccion de **examenes** autogenerados y corregidos en el
 servidor.
 
 Stack: PHP 8 (sin dependencias ni framework), SQLite, JavaScript vanilla,
-**ffmpeg**, **whisper.cpp** y el **CLI de OpenCode** (suscripcion OpenCode Go).
-No requiere Python.
+**ffmpeg**, **whisper.cpp** (o `openai-whisper` opcional como fallback) y el
+**CLI de OpenCode** (suscripcion OpenCode Go). Con whisper.cpp no requiere Python.
 
 ## Requisitos
 
 - PHP 8.1+ con las extensiones `pdo_sqlite`, `curl` y (opcional) `mbstring`.
 - **ffmpeg** para extraer el audio de los `.mp4`.
-- **whisper.cpp** (`whisper-cli`) y un modelo `ggml-*.bin`.
+- **whisper.cpp** (`whisper-cli`) y un modelo `ggml-*.bin`, **o** el CLI de
+  `openai-whisper` (Python) y sus modelos `.pt` ya instalados.
 - **OpenCode CLI** instalado y una API key de OpenCode (`.env`).
 - `proc_open` y `shell_exec` habilitados en PHP (los usan los workers y el cliente de IA).
 
@@ -40,13 +41,17 @@ npm install -g @opencode/cli
 
 ```bash
 sudo apt install ffmpeg
-# whisper.cpp: binario o compilado
+# Opcion A (recomendada): whisper.cpp nativo
 # https://github.com/ggml-org/whisper.cpp/releases -> whisper-bin-ubuntu-x64.tar.gz
-# o: cmake -B build && cmake --build build -j --config Release
-sudo mkdir -p /opt/whisper.cpp && sudo tar -xzf whisper-bin-ubuntu-x64.tar.gz -C /opt/whisper.cpp
+mkdir -p storage/bin/whisper
+tar -xzf whisper-bin-ubuntu-x64.tar.gz -C storage/bin/whisper --strip-components=1
+chmod +x storage/bin/whisper/whisper-cli
+
+# Opcion B (si ya tienes openai-whisper): no instales nada,
+# deja "whisper.engine": "auto" y la app usara el comando `whisper`.
 
 cd /var/www/english_app
-php bin/download-whisper-model.php base
+php bin/download-whisper-model.php base   # solo para la opcion A
 
 # OpenCode CLI
 curl -fsSL https://opencode.ai/install | bash
@@ -122,7 +127,7 @@ bin/download-whisper-model.php# Descarga modelos ggml desde HuggingFace
 | `GET\|POST /settings` | Ajustes (listar, guardar) |
 | `GET /settings/models` | Lista de modelos de OpenCode (CLI) |
 | `GET /settings/test-ai` | Prueba del backend de IA |
-| `GET /settings/test-whisper?model=` | Prueba de whisper.cpp con el ultimo audio |
+| `GET /settings/test-whisper?model=` | Prueba del motor Whisper activo con el ultimo audio |
 | `GET /settings/doctor` | Diagnostico en JSON |
 
 ## Flujo de uso
@@ -147,7 +152,10 @@ OPENCODE_MODEL=opencode-go/deepseek-v4.1-flash
 # Opcionales
 # OPENCODE_BIN=/usr/local/bin/opencode
 # OPENCODE_SERVICE_PORT=28994
+# WHISPER_ENGINE=auto
 # WHISPER_BIN=/opt/whisper.cpp/build/bin/whisper-cli
+# WHISPER_PY_BIN=/home/usuario/.local/bin/whisper
+# WHISPER_LANGUAGE=English
 # FFMPEG_BIN=/usr/bin/ffmpeg
 # WHISPER_MODELS_DIR=storage/models/whisper
 ```
@@ -163,12 +171,28 @@ OPENCODE_MODEL=opencode-go/deepseek-v4.1-flash
 - `paths.video_dir`: carpeta raiz de los videos (con subcarpetas por nivel).
 - `paths.php`: binario de PHP que lanzan los workers (default `php`).
 - `opencode.binary`, `opencode.timeout`, `opencode.archive_sessions`, `opencode.service_port`.
-- `whisper.model` (`tiny|base|small|medium|large-v3`), `whisper.english_only`,
-  `whisper.binary`, `whisper.models_dir`, `whisper.ffmpeg`.
+- `whisper.engine` (`auto`, `whisper_cpp`, `openai_whisper`), `whisper.model`
+  (`tiny|base|small|medium|large-v3`), `whisper.language`, `whisper.english_only`,
+  `whisper.binary` (whisper.cpp), `whisper.openai_binary` (CLI de Python),
+  `whisper.models_dir`, `whisper.ffmpeg`.
 - `exam.passing_score` (default 80) y `exam.questions` (default 12).
 
 Los workers corren en segundo plano y dejan su salida en `storage/tmp/*.log`;
 `/exams` y `/sync` muestran el estado y el log de cada uno.
+
+### Motores de Whisper
+
+- **`auto`** (default): usa whisper.cpp si encuentra `whisper-cli` y el modelo
+  `ggml-*.bin`; si no, usa el CLI `whisper` de `openai-whisper` si esta
+  instalado. Es la opcion recomendada para migrar sin cortar el servicio.
+- **`whisper_cpp`**: obliga a whisper.cpp; si falta el binario o el modelo,
+  falla con un mensaje claro.
+- **`openai_whisper`**: obliga a usar el CLI de Python y sus modelos `.pt`
+  (los que ya tenias en `~/.cache/whisper`). No descarga nada si ya estan.
+
+En `/settings` puedes ver el estado de ambos motores y forzar el que quieras.
+El comando de `openai-whisper` es el mismo que usaba el worker antiguo:
+`whisper <wav> --model <modelo> --language English --output_format txt`.
 
 ## Diagnostico
 
@@ -179,8 +203,8 @@ php bin/doctor.php --json # salida para automatizar
 ```
 
 Comprueba PHP y extensiones, `.env`, key, modelo, binario/version de OpenCode,
-ffmpeg, whisper-cli, modelo ggml, permisos de `storage/`, `paths.video_dir` y la
-integridad/conteos de SQLite.
+ffmpeg, ambos motores de Whisper y sus modelos, permisos de `storage/`,
+`paths.video_dir` y la integridad/conteos de SQLite.
 
 ## Instalacion y migraciones
 
@@ -197,6 +221,10 @@ Los tres scripts son idempotentes (`CREATE TABLE/INDEX IF NOT EXISTS`).
 > y `.env.example`.
 
 ## Despliegue en Ubuntu
+
+> En el servidor actual el proyecto esta en
+> `/home/mauricio/.openclaw/workspace/english_app`; los ejemplos usan
+> `/var/www/english_app`. Ajusta la ruta y el usuario del servicio.
 
 1. **Respaldo antes de actualizar**
 
@@ -266,12 +294,14 @@ WantedBy=multi-user.target
 ```
 
 Si usas Apache/php-fpm, revisa AppArmor/permissions para que el usuario del
-servicio pueda ejecutar `opencode`, `ffmpeg` y `whisper-cli` y escribir en
-`storage/` y `storage/runtime/opencode/`.
+servicio pueda ejecutar `opencode`, `ffmpeg`, `whisper-cli` (o `whisper` de
+Python) y escribir en `storage/` y `storage/runtime/opencode/`.
 
 ## Notas
 
 - Requiere PHP 8.1+ (usa `match`, tipos `mixed`, propiedades tipadas y `str_contains`).
+- Python **no es necesario** con whisper.cpp. `openai-whisper` es un fallback
+  opcional para reutilizar una instalacion existente mientras migras.
 - Si falta `mbstring`, `backend/helpers/utf8.php` incluye un truncado UTF-8 alternativo.
 - La correccion de examenes es 100% server-side; las respuestas no viajan al cliente.
 - La app pide JSON a OpenCode mediante instrucciones + esquema en el prompt (el CLI
