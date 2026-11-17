@@ -9,8 +9,10 @@ use App\Core\Controller;
 use App\Core\Request;
 use App\Models\Lesson;
 use App\Services\AiConfig;
+use App\Services\Ffmpeg;
 use App\Services\LessonProcessor;
 use App\Services\ProcessRunner;
+use App\Services\Whisper;
 
 final class SyncController extends Controller
 {
@@ -32,6 +34,12 @@ final class SyncController extends Controller
             'config'        => AiConfig::load(),
             'whisperModels' => Config::WHISPER_MODELS,
             'logs'          => ProcessRunner::recentLogs(8),
+            'prerequisites' => [
+                'ffmpeg'  => Ffmpeg::binary(),
+                'whisper' => Whisper::binary(),
+                'model'   => Whisper::modelFile(Whisper::defaultModel()),
+                'ready'   => Whisper::ready() && Ffmpeg::binary() !== null,
+            ],
             'status'        => $this->statusMessage((string) Request::query('status', '')),
         ]);
     }
@@ -39,14 +47,22 @@ final class SyncController extends Controller
     public function processAll(array $params = []): void
     {
         $whisper = $this->resolveWhisper(Request::query('whisper'));
+        if (($error = $this->missingPrerequisite($whisper)) !== null) {
+            $this->redirect('/sync?status=' . $error);
+            return;
+        }
         (new LessonProcessor())->processAll($whisper);
         $this->redirect('/sync?status=processing&whisper=' . urlencode($whisper));
     }
 
     public function processOne(array $params): void
     {
-        $file = (string) $params['file'];
         $whisper = $this->resolveWhisper(Request::query('whisper'));
+        if (($error = $this->missingPrerequisite($whisper)) !== null) {
+            $this->redirect('/sync?status=' . $error);
+            return;
+        }
+        $file = (string) $params['file'];
         (new LessonProcessor())->processOne($file, $whisper);
         $this->redirect('/sync?status=processing_one&file=' . urlencode($file));
     }
@@ -108,14 +124,39 @@ final class SyncController extends Controller
         return in_array($value, Config::WHISPER_MODELS, true) ? $value : $default;
     }
 
+    /**
+     * @return string|null status code when a native dependency is missing
+     */
+    private function missingPrerequisite(?string $whisperModel = null): ?string
+    {
+        if (ProcessRunner::resolveBinary(AiConfig::phpBinary()) === null) {
+            return 'php_missing';
+        }
+        if (Ffmpeg::binary() === null) {
+            return 'ffmpeg_missing';
+        }
+        if (Whisper::binary() === null) {
+            return 'whisper_missing';
+        }
+        $model = $whisperModel ?: Whisper::defaultModel();
+        if (!is_file(Whisper::modelFile($model))) {
+            return 'whisper_model_missing';
+        }
+        return null;
+    }
+
     private function statusMessage(string $status): string
     {
         return match ($status) {
-            'processing'     => 'Procesando los videos pendientes en segundo plano. Recarga la pagina en unos minutos.',
-            'processing_one' => 'Procesando el archivo en segundo plano.',
-            're_enrich'      => 'Regenerando la explicacion y los ejercicios con IA.',
-            'reset'          => 'Leccion reseteada exitosamente.',
-            default          => '',
+            'processing'          => 'Procesando los videos pendientes en segundo plano. Recarga la pagina en unos minutos.',
+            'processing_one'      => 'Procesando el archivo en segundo plano.',
+            're_enrich'           => 'Regenerando la explicacion y los ejercicios con IA.',
+            'reset'               => 'Leccion reseteada exitosamente.',
+            'php_missing'         => 'No se encontro el binario de PHP configurado (paths.php en ai_config.json).',
+            'ffmpeg_missing'      => 'No se encontro ffmpeg. Configura la ruta en /settings o en FFMPEG_BIN.',
+            'whisper_missing'     => 'No se encontro whisper-cli. Descarga whisper.cpp y configura la ruta en /settings.',
+            'whisper_model_missing' => 'Falta el modelo ggml de Whisper. Revisa la seccion Whisper en /settings.',
+            default               => '',
         };
     }
 }
