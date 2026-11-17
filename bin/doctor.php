@@ -58,17 +58,32 @@ $check('opencode service port', true, (string) OpenCode::servicePort());
 $ffmpeg = Ffmpeg::binary();
 $check('ffmpeg', $ffmpeg !== null, $ffmpeg ?? 'no encontrado', true);
 
-$whisper = Whisper::binary();
-$check('whisper-cli', $whisper !== null, $whisper ?? 'no encontrado', true);
-
-$whisperModel = Whisper::defaultModel();
-$modelFile = Whisper::modelFile($whisperModel);
-$modelExists = is_file($modelFile);
+$whisper = Whisper::diagnostics();
 $check(
-    'modelo Whisper',
-    $modelExists,
-    ($modelExists ? $modelFile . ' (' . round(filesize($modelFile) / 1048576) . ' MB)' : $modelFile . ' no existe -> ' . Whisper::modelUrl($whisperModel)),
+    'motor Whisper',
+    Whisper::ready(),
+    $whisper['engine_label'] . ' / config: ' . $whisper['configured_engine'] . ' / idioma: ' . $whisper['language'],
     true
+);
+$check(
+    'whisper.cpp',
+    $whisper['cpp']['binary'] !== null,
+    ($whisper['cpp']['binary'] ?? 'no encontrado') . ($whisper['cpp']['version'] ? ' / ' . $whisper['cpp']['version'] : '')
+);
+$check(
+    'modelo whisper.cpp',
+    (bool) $whisper['cpp']['model_exists'],
+    $whisper['cpp']['model_file'] . ((bool) $whisper['cpp']['model_exists'] ? ' (' . round(filesize($whisper['cpp']['model_file']) / 1048576) . ' MB)' : ' no existe')
+);
+$check(
+    'openai-whisper',
+    $whisper['openai']['binary'] !== null,
+    $whisper['openai']['binary'] ?? 'no encontrado (opcional)'
+);
+$check(
+    'modelo openai-whisper',
+    (bool) $whisper['openai']['model_exists'],
+    $whisper['openai']['model_file'] . ((bool) $whisper['openai']['model_exists'] ? '' : ' (se descargara al usar)')
 );
 
 $check('storage/tmp', is_writable(Config::tmpDir()), Config::tmpDir() . (is_writable(Config::tmpDir()) ? ' escribible' : ' NO escribible'), true);
