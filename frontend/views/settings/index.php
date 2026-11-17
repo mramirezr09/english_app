@@ -2,50 +2,110 @@
 /** @var array $cfg */
 /** @var string[] $models */
 /** @var string $currentModel */
+/** @var bool $hasKey */
+/** @var string $keyMasked */
+/** @var string[] $whisperModels */
+/** @var string $envPath */
+/** @var bool $envWritable */
+/** @var array $diagnostics */
 /** @var string|null $message */
 /** @var string|null $error */
+
+$h = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES);
+$ok = static fn (bool $condition): string => $condition ? '&#9989;' : '&#10060;';
+$opencode = $diagnostics['opencode'];
+$whisper = $diagnostics['whisper'];
+$ffmpeg = $diagnostics['ffmpeg'];
+$db = $diagnostics['db'];
+$php = $diagnostics['php'];
+$environment = $diagnostics['env'];
+$video = $diagnostics['video'];
+$storage = $diagnostics['storage'];
 ?>
 <a href="/" style="text-decoration: none; color: #3498db;">&larr; Volver al indice</a>
 <h1>&#9881;&#65039; Ajustes</h1>
 
-<?php if ($message): ?><p class="success"><?php echo htmlspecialchars($message); ?></p><?php endif; ?>
-<?php if ($error): ?><p class="error"><?php echo htmlspecialchars($error); ?></p><?php endif; ?>
+<?php if ($message): ?><p class="success"><?php echo $h($message); ?></p><?php endif; ?>
+<?php if ($error): ?><p class="error"><?php echo $h($error); ?></p><?php endif; ?>
 
 <form method="post" action="/settings" class="content-section">
     <h2>Motor de IA</h2>
-    <label class="field">Backend:
-        <select name="backend" class="form-control">
-            <option value="ollama" <?php echo $cfg['backend'] === 'ollama' ? 'selected' : ''; ?>>Ollama (local)</option>
-            <option value="openclaw" <?php echo $cfg['backend'] === 'openclaw' ? 'selected' : ''; ?>>OpenClaw CLI</option>
-        </select>
-    </label>
+    <p style="color:#666; margin-top:0;">
+        OpenCode CLI usa tu suscripcion (modelos <code>opencode-go/*</code>) o los modelos gratuitos
+        (<code>opencode/*-free</code>). La API key y el modelo se guardan en <code><?php echo $h($envPath); ?></code>.
+    </p>
 
-    <h3>Ollama</h3>
-    <label class="field">Endpoint: <input type="text" name="ollama_endpoint" class="form-control" value="<?php echo htmlspecialchars($cfg['ollama']['endpoint']); ?>"></label>
     <label class="field">Modelo:
-        <select name="ollama_model" class="form-control">
-            <?php if (!$models): ?><option value="<?php echo htmlspecialchars($currentModel); ?>"><?php echo htmlspecialchars($currentModel); ?></option><?php endif; ?>
+        <select name="opencode_model" class="form-control">
+            <?php if (!$models): ?><option value="<?php echo $h($currentModel); ?>"><?php echo $h($currentModel); ?></option><?php endif; ?>
             <?php foreach ($models as $m): ?>
-                <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $m === $currentModel ? 'selected' : ''; ?>><?php echo htmlspecialchars($m); ?></option>
+                <option value="<?php echo $h($m); ?>" <?php echo $m === $currentModel ? 'selected' : ''; ?>><?php echo $h($m); ?></option>
             <?php endforeach; ?>
         </select>
     </label>
     <label class="field">Otro modelo (opcional, tiene prioridad):
-        <input type="text" name="ollama_model_custom" class="form-control" placeholder="ej: gemma4:31b-cloud">
+        <input type="text" name="opencode_model_custom" class="form-control" placeholder="ej: opencode-go/deepseek-v4.1-flash#high">
     </label>
-    <label class="field">Timeout (s): <input type="number" name="ollama_timeout" class="form-control" value="<?php echo (int) $cfg['ollama']['timeout']; ?>" min="10"></label>
 
-    <h3>OpenClaw</h3>
-    <label class="field">Binario: <input type="text" name="openclaw_binary" class="form-control" value="<?php echo htmlspecialchars($cfg['openclaw']['binary']); ?>"></label>
-    <label class="field">Timeout (s): <input type="number" name="openclaw_timeout" class="form-control" value="<?php echo (int) $cfg['openclaw']['timeout']; ?>" min="10"></label>
+    <label class="field">API key (<code>OPENCODE_API_KEY</code>):
+        <input type="password" name="opencode_key" class="form-control" autocomplete="new-password"
+               placeholder="<?php echo $hasKey ? $h('Guardada: ' . $keyMasked) : 'Sin configurar'; ?>">
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+        <input type="checkbox" name="opencode_clear_key" value="1">
+        <span>Eliminar la API key guardada</span>
+    </label>
+    <p style="color:#666; margin-top:0; font-size:0.9em;">
+        Deja el campo vacio para conservar la actual. Puedes crear una key en
+        <a href="https://opencode.ai/console" target="_blank" rel="noopener">OpenCode Console &rarr; API keys</a>.
+    </p>
 
-    <h3>Whisper</h3>
+    <label class="field">Binario de opencode (opcional, se autodetecta):
+        <input type="text" name="opencode_binary" class="form-control" value="<?php echo $h($cfg['opencode']['binary'] ?? ''); ?>"
+               placeholder="ej: /usr/local/bin/opencode o C:\Users\...\opencode.exe">
+    </label>
+    <label class="field">Timeout (s):
+        <input type="number" name="opencode_timeout" class="form-control" value="<?php echo (int) ($cfg['opencode']['timeout'] ?? 300); ?>" min="10">
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+        <input type="checkbox" name="opencode_archive" value="1" <?php echo !empty($cfg['opencode']['archive_sessions']) ? 'checked' : ''; ?>>
+        <span>Archivar las sesiones que crea la app (recomendado)</span>
+    </label>
+
+    <h3>Videos</h3>
+    <label class="field">Carpeta raiz de los videos:
+        <input type="text" name="video_dir" class="form-control" value="<?php echo $h($cfg['paths']['video_dir'] ?? ''); ?>"
+               placeholder="ej: C:\videos\ingles o /home/usuario/ingles">
+    </label>
+    <p style="color:#666; margin-top:0; font-size:0.9em;">
+        Dentro de esta carpeta van las subcarpetas por nivel (<code>4A/</code>, <code>4B/</code>, ...).
+    </p>
+
+    <h3>Whisper (local, sin Python)</h3>
     <label class="field">Modelo:
         <select name="whisper_model" class="form-control">
             <?php foreach ($whisperModels as $w): ?>
-                <option value="<?php echo $w; ?>" <?php echo $w === $cfg['whisper']['model'] ? 'selected' : ''; ?>><?php echo $w; ?></option>
+                <option value="<?php echo $h($w); ?>" <?php echo $w === ($cfg['whisper']['model'] ?? 'base') ? 'selected' : ''; ?>>
+                    <?php echo $h($w); ?><?php echo in_array($w, ['tiny', 'base', 'small', 'medium'], true) ? ' (english)' : ''; ?>
+                </option>
             <?php endforeach; ?>
         </select>
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+        <input type="checkbox" name="whisper_english_only" value="1" <?php echo !empty($cfg['whisper']['english_only']) ? 'checked' : ''; ?>>
+        <span>Usar modelos <code>.en</code> (recomendado para clases de ingles)</span>
+    </label>
+    <label class="field">Binario de whisper-cli (opcional, se autodetecta):
+        <input type="text" name="whisper_binary" class="form-control" value="<?php echo $h($cfg['whisper']['binary'] ?? ''); ?>"
+               placeholder="ej: /opt/whisper.cpp/build/bin/whisper-cli o C:\whisper\whisper-cli.exe">
+    </label>
+    <label class="field">Binario de ffmpeg (opcional, se autodetecta):
+        <input type="text" name="whisper_ffmpeg" class="form-control" value="<?php echo $h($cfg['whisper']['ffmpeg'] ?? ''); ?>"
+               placeholder="ej: /usr/bin/ffmpeg o C:\ffmpeg\bin\ffmpeg.exe">
+    </label>
+    <label class="field">Carpeta de modelos ggml:
+        <input type="text" name="whisper_models_dir" class="form-control" value="<?php echo $h($cfg['whisper']['models_dir'] ?? ''); ?>"
+               placeholder="<?php echo $h($whisper['models_dir']); ?>">
     </label>
 
     <h3>Examenes</h3>
@@ -62,10 +122,33 @@
 <div class="content-section">
     <h2>Pruebas</h2>
     <div class="actions">
-        <button class="btn" type="button" onclick="refreshModels()">Listar modelos Ollama</button>
+        <button class="btn" type="button" onclick="refreshModels()">Listar modelos OpenCode</button>
         <button class="btn" style="background:#8e44ad" type="button" onclick="testAi()">Probar IA</button>
         <button class="btn" style="background:#16a085" type="button" onclick="testWhisper()">Probar Whisper</button>
+        <button class="btn" style="background:#34495e" type="button" onclick="runDoctor()">Diagnostico</button>
     </div>
     <pre id="result" style="background:#f4f4f4; padding:15px; border-radius:8px; white-space:pre-wrap; min-height:60px;">Sin resultados todavia.</pre>
+</div>
+
+<div class="content-section">
+    <h2>Diagnostico del entorno</h2>
+    <div class="table-wrap">
+        <table class="table">
+            <tbody>
+                <tr><th>PHP</th><td><?php echo $h($php['version'] . ' (' . $php['sapi'] . ')'); ?> / usuario: <?php echo $h($php['user']); ?></td></tr>
+                <tr><th>Extensiones</th><td>pdo_sqlite <?php echo $ok((bool) $php['pdo_sqlite']); ?> / curl <?php echo $ok((bool) $php['curl']); ?> / mbstring <?php echo $ok((bool) $php['mbstring']); ?> / proc_open <?php echo $ok((bool) $php['proc_open']); ?> / shell_exec <?php echo $ok((bool) $php['shell_exec']); ?></td></tr>
+                <tr><th>.env</th><td><?php echo $ok((bool) $environment['exists'] && (bool) $environment['writable']); ?> <?php echo $h($environment['path']); ?> / key <?php echo $ok((bool) $environment['key']); ?></td></tr>
+                <tr><th>Modelo OpenCode</th><td><?php echo $h($environment['model']); ?></td></tr>
+                <tr><th>opencode</th><td><?php echo $ok($opencode['binary'] !== null); ?> <?php echo $h($opencode['binary'] ?? 'no encontrado'); ?> <?php echo $h($opencode['version'] ?? ''); ?></td></tr>
+                <tr><th>API key OpenCode</th><td><?php echo $ok($opencode['key'] === 'ok'); ?> <?php echo $h($opencode['key_masked']); ?></td></tr>
+                <tr><th>whisper-cli</th><td><?php echo $ok($whisper['binary'] !== null); ?> <?php echo $h($whisper['binary'] ?? 'no encontrado'); ?></td></tr>
+                <tr><th>Modelo Whisper</th><td><?php echo $ok((bool) $whisper['model_exists']); ?> <?php echo $h($whisper['model_file']); ?></td></tr>
+                <tr><th>ffmpeg</th><td><?php echo $ok($ffmpeg['binary'] !== null); ?> <?php echo $h($ffmpeg['binary'] ?? 'no encontrado'); ?></td></tr>
+                <tr><th>Carpeta de videos</th><td><?php echo $ok((bool) $video['ok']); ?> <?php echo $h($video['dir']); ?></td></tr>
+                <tr><th>storage</th><td>tmp <?php echo $ok((bool) $storage['tmp']); ?> / runtime <?php echo $ok((bool) $storage['runtime']); ?> / modelos <?php echo $ok((bool) $storage['models']); ?></td></tr>
+                <tr><th>Base de datos</th><td><?php echo $ok(($db['integrity'] ?? '') === 'ok'); ?> <?php echo $h($db['path']); ?> / lecciones: <?php echo (int) ($db['lessons'] ?? 0); ?> / transcritas: <?php echo (int) ($db['transcribed'] ?? 0); ?> / preguntas: <?php echo (int) ($db['questions'] ?? 0); ?> / intentos: <?php echo (int) ($db['attempts'] ?? 0); ?> / schema: <?php echo (int) ($db['schema_version'] ?? 0); ?></td></tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 <script src="/assets/js/settings.js"></script>
