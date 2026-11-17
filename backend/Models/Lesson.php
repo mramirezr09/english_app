@@ -29,6 +29,40 @@ final class Lesson extends Model
         return $stmt->fetch() ?: null;
     }
 
+    public function findByFileName(string $fileName): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM lessons WHERE file_name = ?');
+        $stmt->execute([$fileName]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function saveTranscription(string $fileName, string $text): void
+    {
+        $stmt = $this->db->prepare('UPDATE lessons SET transcription = ? WHERE file_name = ?');
+        $stmt->execute([$text, $fileName]);
+    }
+
+    public function saveEnrichment(int|string $id, ?string $explanation, ?array $exercises): void
+    {
+        if ($explanation !== null && $exercises !== null) {
+            $stmt = $this->db->prepare('UPDATE lessons SET explanation = ?, exercises = ? WHERE id = ?');
+            $stmt->execute([$explanation, json_encode($exercises, JSON_UNESCAPED_UNICODE), $id]);
+        } elseif ($explanation !== null) {
+            $stmt = $this->db->prepare('UPDATE lessons SET explanation = ? WHERE id = ?');
+            $stmt->execute([$explanation, $id]);
+        } elseif ($exercises !== null) {
+            $stmt = $this->db->prepare('UPDATE lessons SET exercises = ? WHERE id = ?');
+            $stmt->execute([json_encode($exercises, JSON_UNESCAPED_UNICODE), $id]);
+        }
+    }
+
+    public function withTranscription(): array
+    {
+        return $this->db->query(
+            "SELECT * FROM lessons WHERE transcription IS NOT NULL AND transcription <> '' ORDER BY id ASC"
+        )->fetchAll();
+    }
+
     public function random(): ?array
     {
         $row = $this->db->query('SELECT * FROM lessons ORDER BY RANDOM() LIMIT 1')->fetch();
