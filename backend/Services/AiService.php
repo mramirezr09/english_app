@@ -4,40 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Core\Config;
-
 /**
- * Runs a prompt through the shared Python AI client (backend/workers/ai_client.py).
+ * Single entry point for AI prompts used by controllers.
+ *
+ * All backends are native now (no Python bridge): OpenCode CLI only.
  */
 final class AiService
 {
-    public static function ask(string $prompt, int $timeout = 240): ?string
+    public static function ask(string $prompt, int $timeout = 240, bool $jsonMode = false): ?string
     {
-        $script = Config::worker('ai_client.py');
-        $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
+        // The built-in server and php-fpm default to 30 s; AI calls need more.
+        @set_time_limit(max(60, $timeout + 30));
 
-        $process = proc_open([AiConfig::pythonBinary(), $script], $descriptors, $pipes);
-        if (!is_resource($process)) {
-            return null;
-        }
+        return OpenCode::chat($prompt, [
+            'timeout'   => $timeout,
+            'json_mode' => $jsonMode,
+        ]);
+    }
 
-        fwrite($pipes[0], $prompt);
-        fclose($pipes[0]);
-
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        $exit = proc_close($process);
-        if ($exit !== 0 && trim((string) $stdout) === '') {
-            error_log('AiService::ask failed: ' . trim((string) $stderr));
-            return null;
-        }
-        return trim((string) $stdout);
+    public static function lastError(): ?string
+    {
+        return OpenCode::lastError();
     }
 }
