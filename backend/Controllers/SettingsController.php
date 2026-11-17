@@ -86,8 +86,15 @@ final class SettingsController extends Controller
 
         $whisperModel = trim((string) Request::post('whisper_model', $cfg['whisper']['model'] ?? 'base'));
         $cfg['whisper']['model'] = in_array($whisperModel, Config::WHISPER_MODELS, true) ? $whisperModel : 'base';
+        $whisperEngine = trim((string) Request::post('whisper_engine', $cfg['whisper']['engine'] ?? 'auto'));
+        $cfg['whisper']['engine'] = in_array($whisperEngine, ['auto', 'whisper_cpp', 'openai_whisper'], true)
+            ? $whisperEngine
+            : 'auto';
+        $language = trim((string) Request::post('whisper_language', $cfg['whisper']['language'] ?? 'English'));
+        $cfg['whisper']['language'] = $language !== '' ? $language : 'English';
         $cfg['whisper']['english_only'] = Request::post('whisper_english_only') === '1';
         $cfg['whisper']['binary'] = trim((string) Request::post('whisper_binary', $cfg['whisper']['binary'] ?? ''));
+        $cfg['whisper']['openai_binary'] = trim((string) Request::post('whisper_openai_binary', $cfg['whisper']['openai_binary'] ?? ''));
         $cfg['whisper']['ffmpeg'] = trim((string) Request::post('whisper_ffmpeg', $cfg['whisper']['ffmpeg'] ?? ''));
         $cfg['whisper']['models_dir'] = trim((string) Request::post('whisper_models_dir', $cfg['whisper']['models_dir'] ?? ''));
 
