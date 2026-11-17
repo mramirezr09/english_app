@@ -23,3 +23,6 @@ spl_autoload_register(static function (string $class): void {
 });
 
 require_once BASE_PATH . '/backend/helpers/utf8.php';
+
+// Load local environment overrides (.env) for CLI and web requests.
+\App\Core\Env::load(BASE_PATH . '/.env');
