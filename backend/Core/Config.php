@@ -9,11 +9,16 @@ namespace App\Core;
  */
 final class Config
 {
-    public const WHISPER_MODELS = ['tiny', 'base', 'small', 'medium', 'large-v3', 'large'];
+    public const WHISPER_MODELS = ['tiny', 'base', 'small', 'medium', 'large-v3'];
 
     public static function root(): string
     {
         return BASE_PATH;
+    }
+
+    public static function envPath(): string
+    {
+        return self::root() . '/.env';
     }
 
     public static function configDir(): string
@@ -34,6 +39,23 @@ final class Config
     public static function tmpDir(): string
     {
         return self::storageDir() . '/tmp';
+    }
+
+    /**
+     * Writable HOME/XDG directory used by the OpenCode CLI when the app runs
+     * as a service user. Keeps the app's sessions separate from the user's.
+     */
+    public static function runtimeDir(): string
+    {
+        return self::storageDir() . '/runtime';
+    }
+
+    /**
+     * Default directory for whisper.cpp ggml models.
+     */
+    public static function modelsDir(): string
+    {
+        return self::storageDir() . '/models/whisper';
     }
 
     public static function viewsDir(): string
