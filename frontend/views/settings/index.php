@@ -13,6 +13,18 @@
 
 $h = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES);
 $ok = static fn (bool $condition): string => $condition ? '&#9989;' : '&#10060;';
+$optional = static function (bool $found, bool $active): string {
+    if ($found) {
+        return '&#9989;';
+    }
+    return $active ? '&#10060;' : '&#9898;';
+};
+$modelState = static function (bool $exists, bool $active): string {
+    if (!$active) {
+        return '&#9898;';
+    }
+    return $exists ? '&#9989;' : '&#9888;';
+};
 $opencode = $diagnostics['opencode'];
 $whisper = $diagnostics['whisper'];
 $ffmpeg = $diagnostics['ffmpeg'];
@@ -81,7 +93,15 @@ $storage = $diagnostics['storage'];
         Dentro de esta carpeta van las subcarpetas por nivel (<code>4A/</code>, <code>4B/</code>, ...).
     </p>
 
-    <h3>Whisper (local, sin Python)</h3>
+    <h3>Whisper (transcripcion local)</h3>
+    <label class="field">Motor:
+        <select name="whisper_engine" class="form-control">
+            <?php $engine = $cfg['whisper']['engine'] ?? 'auto'; ?>
+            <option value="auto" <?php echo $engine === 'auto' ? 'selected' : ''; ?>>auto (whisper.cpp si esta listo; si no, openai-whisper)</option>
+            <option value="whisper_cpp" <?php echo $engine === 'whisper_cpp' ? 'selected' : ''; ?>>whisper.cpp (nativo, sin Python)</option>
+            <option value="openai_whisper" <?php echo $engine === 'openai_whisper' ? 'selected' : ''; ?>>openai-whisper (CLI de Python)</option>
+        </select>
+    </label>
     <label class="field">Modelo:
         <select name="whisper_model" class="form-control">
             <?php foreach ($whisperModels as $w): ?>
@@ -91,13 +111,20 @@ $storage = $diagnostics['storage'];
             <?php endforeach; ?>
         </select>
     </label>
+    <label class="field">Idioma del audio:
+        <input type="text" name="whisper_language" class="form-control" value="<?php echo $h($cfg['whisper']['language'] ?? 'English'); ?>" placeholder="English">
+    </label>
     <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
         <input type="checkbox" name="whisper_english_only" value="1" <?php echo !empty($cfg['whisper']['english_only']) ? 'checked' : ''; ?>>
-        <span>Usar modelos <code>.en</code> (recomendado para clases de ingles)</span>
+        <span>Usar modelos <code>.en</code> de whisper.cpp (recomendado para clases de ingles)</span>
     </label>
-    <label class="field">Binario de whisper-cli (opcional, se autodetecta):
+    <label class="field">Binario de whisper-cli (whisper.cpp, opcional):
         <input type="text" name="whisper_binary" class="form-control" value="<?php echo $h($cfg['whisper']['binary'] ?? ''); ?>"
                placeholder="ej: /opt/whisper.cpp/build/bin/whisper-cli o C:\whisper\whisper-cli.exe">
+    </label>
+    <label class="field">Binario de whisper (openai-whisper, opcional):
+        <input type="text" name="whisper_openai_binary" class="form-control" value="<?php echo $h($cfg['whisper']['openai_binary'] ?? ''); ?>"
+               placeholder="ej: /home/usuario/.local/bin/whisper">
     </label>
     <label class="field">Binario de ffmpeg (opcional, se autodetecta):
         <input type="text" name="whisper_ffmpeg" class="form-control" value="<?php echo $h($cfg['whisper']['ffmpeg'] ?? ''); ?>"
@@ -141,8 +168,11 @@ $storage = $diagnostics['storage'];
                 <tr><th>Modelo OpenCode</th><td><?php echo $h($environment['model']); ?></td></tr>
                 <tr><th>opencode</th><td><?php echo $ok($opencode['binary'] !== null); ?> <?php echo $h($opencode['binary'] ?? 'no encontrado'); ?> <?php echo $h($opencode['version'] ?? ''); ?></td></tr>
                 <tr><th>API key OpenCode</th><td><?php echo $ok($opencode['key'] === 'ok'); ?> <?php echo $h($opencode['key_masked']); ?></td></tr>
-                <tr><th>whisper-cli</th><td><?php echo $ok($whisper['binary'] !== null); ?> <?php echo $h($whisper['binary'] ?? 'no encontrado'); ?></td></tr>
-                <tr><th>Modelo Whisper</th><td><?php echo $ok((bool) $whisper['model_exists']); ?> <?php echo $h($whisper['model_file']); ?></td></tr>
+                <tr><th>Motor Whisper</th><td><?php echo $ok((bool) $whisper['ready']); ?> <?php echo $h($whisper['engine_label']); ?> (config: <?php echo $h($whisper['configured_engine']); ?>, idioma: <?php echo $h($whisper['language']); ?>)</td></tr>
+                <tr><th>whisper.cpp</th><td><?php echo $optional($whisper['cpp']['binary'] !== null, $whisper['engine'] === 'whisper_cpp'); ?> <?php echo $h($whisper['cpp']['binary'] ?? 'no encontrado'); ?> <?php echo $h($whisper['cpp']['version'] ?? ''); ?><?php echo $whisper['engine'] === 'whisper_cpp' ? '' : ' (opcional)'; ?></td></tr>
+                <tr><th>Modelo whisper.cpp</th><td><?php echo $modelState((bool) $whisper['cpp']['model_exists'], $whisper['engine'] === 'whisper_cpp'); ?> <?php echo $h($whisper['cpp']['model_file']); ?></td></tr>
+                <tr><th>openai-whisper</th><td><?php echo $optional($whisper['openai']['binary'] !== null, $whisper['engine'] === 'openai_whisper'); ?> <?php echo $h($whisper['openai']['binary'] ?? 'no encontrado'); ?><?php echo $whisper['engine'] === 'openai_whisper' ? '' : ' (opcional)'; ?></td></tr>
+                <tr><th>Modelo openai-whisper</th><td><?php echo $modelState((bool) $whisper['openai']['model_exists'], $whisper['engine'] === 'openai_whisper'); ?> <?php echo $h($whisper['openai']['model_file']); ?> <?php echo $whisper['openai']['model_exists'] ? '' : '(se descargara al usar)'; ?></td></tr>
                 <tr><th>ffmpeg</th><td><?php echo $ok($ffmpeg['binary'] !== null); ?> <?php echo $h($ffmpeg['binary'] ?? 'no encontrado'); ?></td></tr>
                 <tr><th>Carpeta de videos</th><td><?php echo $ok((bool) $video['ok']); ?> <?php echo $h($video['dir']); ?></td></tr>
                 <tr><th>storage</th><td>tmp <?php echo $ok((bool) $storage['tmp']); ?> / runtime <?php echo $ok((bool) $storage['runtime']); ?> / modelos <?php echo $ok((bool) $storage['models']); ?></td></tr>
