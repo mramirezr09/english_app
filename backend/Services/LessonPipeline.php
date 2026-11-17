@@ -90,7 +90,7 @@ final class LessonPipeline
                 return false;
             }
 
-            $log('Iniciando transcripcion con whisper.cpp (modelo: ' . $model . ')...');
+            $log('Iniciando transcripcion con ' . Whisper::engineLabel() . ' (modelo: ' . $model . ')...');
             $text = Whisper::transcribe($wav, $model);
 
             // Keep only the conventional sample used by /settings/test-whisper;
