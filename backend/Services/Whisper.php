@@ -8,15 +8,18 @@ use App\Core\Config;
 use App\Core\Env;
 
 /**
- * Local transcription with whisper.cpp (native binary, no Python).
+ * Local transcription with a selectable engine:
  *
- * Model names are the logical ones used by the UI (tiny/base/small/medium/
- * large-v3); for English lessons the .en variants are preferred.
+ * - whisper_cpp: native whisper.cpp (preferred, no Python)
+ * - openai_whisper: the existing `whisper` CLI (Python), reusing its .pt cache
+ * - auto: whisper.cpp when the binary+model are ready, openai-whisper otherwise
  */
 final class Whisper
 {
-    private static ?string $binary = null;
-    private static bool $resolved = false;
+    private static ?string $cppBinary = null;
+    private static bool $cppResolved = false;
+    private static ?string $pyBinary = null;
+    private static bool $pyResolved = false;
     private static ?string $lastError = null;
 
     public static function lastError(): ?string
@@ -24,12 +27,68 @@ final class Whisper
         return self::$lastError;
     }
 
-    public static function binary(): ?string
+    // ------------------------------------------------------------------ #
+    // Engine selection
+    // ------------------------------------------------------------------ #
+    public static function configuredEngine(): string
     {
-        if (self::$resolved) {
-            return self::$binary;
+        $cfg = AiConfig::load();
+        $value = strtolower(trim((string) Env::get('WHISPER_ENGINE', (string) ($cfg['whisper']['engine'] ?? 'auto'))));
+        return match ($value) {
+            'whisper_cpp', 'whisper-cpp', 'cpp' => 'whisper_cpp',
+            'openai_whisper', 'openai-whisper', 'python', 'openai' => 'openai_whisper',
+            default => 'auto',
+        };
+    }
+
+    /**
+     * Resolve which engine will be used, or null if none is available.
+     */
+    public static function engine(): ?string
+    {
+        $configured = self::configuredEngine();
+
+        if ($configured === 'whisper_cpp') {
+            return self::cppBinary() !== null ? 'whisper_cpp' : null;
         }
-        self::$resolved = true;
+        if ($configured === 'openai_whisper') {
+            return self::openAiBinary() !== null ? 'openai_whisper' : null;
+        }
+
+        $model = self::defaultModel();
+        if (self::cppReady($model)) {
+            return 'whisper_cpp';
+        }
+        if (self::openAiBinary() !== null) {
+            return 'openai_whisper';
+        }
+        if (self::cppBinary() !== null) {
+            // Binary present but model missing: report whisper.cpp so the UI
+            // can point to the missing ggml file instead of "no engine".
+            return 'whisper_cpp';
+        }
+        return null;
+    }
+
+    public static function engineLabel(?string $engine = null): string
+    {
+        $engine = $engine ?? self::engine();
+        return match ($engine) {
+            'whisper_cpp' => 'whisper.cpp (nativo)',
+            'openai_whisper' => 'openai-whisper (Python)',
+            default => 'no disponible',
+        };
+    }
+
+    // ------------------------------------------------------------------ #
+    // whisper.cpp
+    // ------------------------------------------------------------------ #
+    public static function cppBinary(): ?string
+    {
+        if (self::$cppResolved) {
+            return self::$cppBinary;
+        }
+        self::$cppResolved = true;
 
         $cfg = AiConfig::load();
         $configured = trim((string) Env::get('WHISPER_BIN', (string) ($cfg['whisper']['binary'] ?? '')));
@@ -41,6 +100,7 @@ final class Whisper
             Config::root() . '/storage/bin/whisper/whisper-cli' . (Shell::isWindows() ? '.exe' : ''),
             Config::root() . '/storage/bin/whisper/Release/whisper-cli.exe',
             Config::root() . '/storage/bin/whisper/Release/main.exe',
+            Config::root() . '/storage/bin/whisper/whisper-bin-ubuntu-x64/whisper-cli',
             Config::root() . '/storage/bin/whisper-cli' . (Shell::isWindows() ? '.exe' : ''),
             Config::root() . '/storage/bin/whisper.cpp/build/bin/whisper-cli' . (Shell::isWindows() ? '.exe' : ''),
             Config::root() . '/storage/bin/whisper.cpp/build/bin/Release/whisper-cli.exe',
@@ -52,16 +112,36 @@ final class Whisper
             $known[] = '/usr/bin/whisper-cli';
         }
 
-        self::$binary = Shell::resolveBinary($names, $configured, $known);
-        return self::$binary;
+        self::$cppBinary = Shell::resolveBinary($names, $configured, $known);
+        return self::$cppBinary;
+    }
+
+    /** Backwards-compatible alias used by older views/scripts. */
+    public static function binary(): ?string
+    {
+        return self::cppBinary();
+    }
+
+    public static function cppReady(?string $model = null): bool
+    {
+        $model = $model ?: self::defaultModel();
+        return self::cppBinary() !== null && is_file(self::modelFile($model));
     }
 
     public static function version(): ?string
     {
-        $binary = self::binary();
+        $binary = self::cppBinary();
         if ($binary === null) {
             return null;
         }
+
+        $result = Shell::run([$binary, '--version'], null, 15);
+        $text = trim($result['stdout'] . ' ' . $result['stderr']);
+        if ($text !== '') {
+            $line = strtok($text, "\n");
+            return $line !== false ? trim($line) : $text;
+        }
+
         $result = Shell::run([$binary, '--help'], null, 15);
         $text = $result['stdout'] . ' ' . $result['stderr'];
         if (preg_match('/whisper[^\r\n]*/i', $text, $match) === 1) {
@@ -70,6 +150,64 @@ final class Whisper
         return $binary;
     }
 
+    // ------------------------------------------------------------------ #
+    // openai-whisper (Python CLI)
+    // ------------------------------------------------------------------ #
+    public static function openAiBinary(): ?string
+    {
+        if (self::$pyResolved) {
+            return self::$pyBinary;
+        }
+        self::$pyResolved = true;
+
+        $cfg = AiConfig::load();
+        $configured = trim((string) Env::get('WHISPER_PY_BIN', (string) ($cfg['whisper']['openai_binary'] ?? '')));
+        $names = Shell::isWindows()
+            ? ['whisper.exe', 'whisper.cmd', 'whisper.bat', 'whisper']
+            : ['whisper'];
+
+        $home = (string) (getenv('HOME') ?: getenv('USERPROFILE') ?: '');
+        $known = $home !== ''
+            ? [rtrim($home, "/\\") . '/.local/bin/whisper']
+            : [];
+        if (!Shell::isWindows()) {
+            $known[] = '/usr/local/bin/whisper';
+            $known[] = '/usr/bin/whisper';
+        } else {
+            $local = (string) (getenv('LOCALAPPDATA') ?: '');
+            if ($local !== '') {
+                foreach (['Python313', 'Python312', 'Python311', 'Python310'] as $python) {
+                    $known[] = rtrim($local, '\\') . '\\Programs\\Python\\' . $python . '\\Scripts\\whisper.exe';
+                }
+            }
+            $appdata = (string) (getenv('APPDATA') ?: '');
+            if ($appdata !== '') {
+                foreach (['Python313', 'Python312', 'Python311', 'Python310'] as $python) {
+                    $known[] = rtrim($appdata, '\\') . '\\Python\\' . $python . '\\Scripts\\whisper.exe';
+                }
+            }
+        }
+
+        self::$pyBinary = Shell::resolveBinary($names, $configured, $known);
+        return self::$pyBinary;
+    }
+
+    public static function openAiModelFile(string $model): string
+    {
+        $model = preg_replace('/[^A-Za-z0-9._-]/', '', $model) ?: 'base';
+        $home = (string) (getenv('HOME') ?: getenv('USERPROFILE') ?: '');
+        $cache = $home !== '' ? rtrim($home, "/\\") . DIRECTORY_SEPARATOR . '.cache' : '.cache';
+        return $cache . DIRECTORY_SEPARATOR . 'whisper' . DIRECTORY_SEPARATOR . $model . '.pt';
+    }
+
+    public static function openAiModelExists(string $model): bool
+    {
+        return is_file(self::openAiModelFile($model));
+    }
+
+    // ------------------------------------------------------------------ #
+    // Shared model/config helpers
+    // ------------------------------------------------------------------ #
     public static function modelsDir(): string
     {
         return AiConfig::whisperModelsDir();
@@ -81,10 +219,27 @@ final class Whisper
         return !empty($cfg['whisper']['english_only']);
     }
 
+    public static function language(): string
+    {
+        $cfg = AiConfig::load();
+        $value = trim((string) Env::get('WHISPER_LANGUAGE', (string) ($cfg['whisper']['language'] ?? 'English')));
+        return $value !== '' ? $value : 'English';
+    }
+
+    public static function languageCode(): string
+    {
+        $value = strtolower(self::language());
+        return match ($value) {
+            'spanish', 'espanol', 'español', 'es' => 'es',
+            'english', 'en', 'ingles', 'inglés' => 'en',
+            default => 'en',
+        };
+    }
+
     public static function modelFile(string $model): string
     {
         $model = preg_replace('/[^A-Za-z0-9._-]/', '', $model) ?: 'base';
-        $englishOnly = self::englishOnly();
+        $englishOnly = self::englishOnly() && self::languageCode() === 'en';
         $englishCapable = in_array($model, ['tiny', 'base', 'small', 'medium'], true);
 
         $file = 'ggml-' . $model . ($englishOnly && $englishCapable ? '.en' : '') . '.bin';
@@ -96,12 +251,6 @@ final class Whisper
         return 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/' . basename(self::modelFile($model));
     }
 
-    public static function ready(?string $model = null): bool
-    {
-        $model = $model ?: self::defaultModel();
-        return self::binary() !== null && is_file(self::modelFile($model));
-    }
-
     public static function defaultModel(): string
     {
         $cfg = AiConfig::load();
@@ -109,15 +258,91 @@ final class Whisper
         return in_array($model, Config::WHISPER_MODELS, true) ? $model : 'base';
     }
 
-    /**
-     * Transcribe a 16 kHz mono WAV file and return the plain text.
-     */
+    public static function ready(?string $model = null): bool
+    {
+        $engine = self::engine();
+        if ($engine === 'whisper_cpp') {
+            return self::cppReady($model);
+        }
+        if ($engine === 'openai_whisper') {
+            return self::openAiBinary() !== null;
+        }
+        return false;
+    }
+
+    public static function missingStatus(?string $model = null): ?string
+    {
+        if (self::ready($model)) {
+            return null;
+        }
+
+        $configured = self::configuredEngine();
+        if ($configured === 'openai_whisper') {
+            return 'whisper_missing';
+        }
+        if ($configured === 'whisper_cpp') {
+            return self::cppBinary() !== null ? 'whisper_model_missing' : 'whisper_missing';
+        }
+
+        // auto
+        return self::engine() === 'whisper_cpp' || self::cppBinary() !== null
+            ? 'whisper_model_missing'
+            : 'whisper_missing';
+    }
+
+    public static function activeBinary(): ?string
+    {
+        return match (self::engine()) {
+            'openai_whisper' => self::openAiBinary(),
+            'whisper_cpp' => self::cppBinary(),
+            default => self::cppBinary() ?? self::openAiBinary(),
+        };
+    }
+
+    public static function activeModelPath(?string $model = null): string
+    {
+        $model = $model ?: self::defaultModel();
+        return self::engine() === 'openai_whisper'
+            ? self::openAiModelFile($model)
+            : self::modelFile($model);
+    }
+
+    public static function activeModelExists(?string $model = null): bool
+    {
+        $model = $model ?: self::defaultModel();
+        return self::engine() === 'openai_whisper'
+            ? self::openAiModelExists($model)
+            : is_file(self::modelFile($model));
+    }
+
+    // ------------------------------------------------------------------ #
+    // Transcription
+    // ------------------------------------------------------------------ #
     public static function transcribe(string $wavPath, ?string $model = null, int $timeout = 7200, int $threads = 0): ?string
     {
         self::$lastError = null;
-
         $model = $model ?: self::defaultModel();
-        $binary = self::binary();
+        $engine = self::engine();
+
+        if ($engine === 'whisper_cpp') {
+            return self::transcribeCpp($wavPath, $model, $timeout, $threads);
+        }
+        if ($engine === 'openai_whisper') {
+            return self::transcribeOpenAi($wavPath, $model, $timeout);
+        }
+
+        self::$lastError = match (self::configuredEngine()) {
+            'openai_whisper' => 'Se selecciono openai-whisper pero no se encontro su CLI. Configura WHISPER_PY_BIN o la ruta en Ajustes.',
+            'whisper_cpp' => 'Se selecciono whisper.cpp pero no se encontro whisper-cli. Configura WHISPER_BIN o la ruta en Ajustes.',
+            default => 'No hay motor Whisper disponible. Configura whisper.cpp (WHISPER_BIN + modelo ggml) '
+                . 'o el CLI de openai-whisper (WHISPER_PY_BIN) en /settings.',
+        };
+        return null;
+    }
+
+    private static function transcribeCpp(string $wavPath, string $model, int $timeout, int $threads): ?string
+    {
+        $binary = self::cppBinary();
         if ($binary === null) {
             self::$lastError = 'No se encontro whisper-cli. Configura WHISPER_BIN o la ruta en Ajustes.';
             return null;
@@ -139,7 +364,7 @@ final class Whisper
             $binary,
             '-m', $modelPath,
             '-f', $wavPath,
-            '-l', 'en',
+            '-l', self::languageCode(),
             '-otxt',
             '-nt',
             '-np',
@@ -155,7 +380,7 @@ final class Whisper
         @unlink($outBase . '.json');
 
         if ($result['timeout']) {
-            self::$lastError = 'Whisper excedio el tiempo limite de ' . $timeout . ' s.';
+            self::$lastError = 'Whisper (whisper.cpp) excedio el tiempo limite de ' . $timeout . ' s.';
             @unlink($txt);
             return null;
         }
@@ -165,7 +390,52 @@ final class Whisper
 
         if ($result['exit'] !== 0 || $text === '') {
             $detail = trim($result['stderr']);
-            self::$lastError = 'Whisper no genero texto (exit ' . $result['exit'] . '). '
+            self::$lastError = 'whisper.cpp no genero texto (exit ' . $result['exit'] . '). '
+                . (strlen($detail) > 800 ? substr($detail, -800) : $detail);
+            return null;
+        }
+
+        return $text;
+    }
+
+    private static function transcribeOpenAi(string $wavPath, string $model, int $timeout): ?string
+    {
+        $binary = self::openAiBinary();
+        if ($binary === null) {
+            self::$lastError = 'No se encontro el CLI de openai-whisper. Configura WHISPER_PY_BIN o la ruta en Ajustes.';
+            return null;
+        }
+        if (!is_file($wavPath)) {
+            self::$lastError = 'No existe el audio: ' . $wavPath;
+            return null;
+        }
+
+        $outDir = Config::tmpDir() . DIRECTORY_SEPARATOR . 'whisper_py_' . md5($wavPath . microtime(true));
+        Config::ensureDirectory($outDir);
+
+        $arguments = [
+            $binary,
+            $wavPath,
+            '--model', $model,
+            '--language', self::language(),
+            '--output_dir', $outDir,
+            '--output_format', 'txt',
+            '--verbose', 'False',
+        ];
+
+        $result = Shell::run($arguments, null, $timeout, Config::tmpDir());
+        $txt = $outDir . DIRECTORY_SEPARATOR . pathinfo($wavPath, PATHINFO_FILENAME) . '.txt';
+        $text = is_file($txt) ? trim((string) file_get_contents($txt)) : '';
+        @unlink($txt);
+        @rmdir($outDir);
+
+        if ($result['timeout']) {
+            self::$lastError = 'Whisper (openai-whisper) excedio el tiempo limite de ' . $timeout . ' s.';
+            return null;
+        }
+        if ($result['exit'] !== 0 || $text === '') {
+            $detail = trim($result['stderr']);
+            self::$lastError = 'openai-whisper no genero texto (exit ' . $result['exit'] . '). '
                 . (strlen($detail) > 800 ? substr($detail, -800) : $detail);
             return null;
         }
@@ -174,19 +444,22 @@ final class Whisper
     }
 
     /**
-     * @return array{ok:bool, model:string, seconds:float, words:int, text:string, error:?string}
+     * @return array{ok:bool, engine:string, engine_label:string, model:string, seconds:float, words:int, text:string, error:?string}
      */
     public static function test(string $model): array
     {
+        $engine = self::engine();
         $audio = Config::tmpDir() . DIRECTORY_SEPARATOR . 'lesson_audio.wav';
         if (!is_file($audio)) {
             return [
-                'ok'      => false,
-                'model'   => $model,
-                'seconds' => 0.0,
-                'words'   => 0,
-                'text'    => '',
-                'error'   => 'No existe audio de prueba. Procesa un video primero (se guarda en storage/tmp/lesson_audio.wav).',
+                'ok'           => false,
+                'engine'       => (string) $engine,
+                'engine_label' => self::engineLabel($engine),
+                'model'        => $model,
+                'seconds'      => 0.0,
+                'words'        => 0,
+                'text'         => '',
+                'error'        => 'No existe audio de prueba. Procesa un video primero (se guarda en storage/tmp/lesson_audio.wav).',
             ];
         }
 
@@ -196,40 +469,64 @@ final class Whisper
 
         if ($text === null) {
             return [
-                'ok'      => false,
-                'model'   => $model,
-                'seconds' => $elapsed,
-                'words'   => 0,
-                'text'    => '',
-                'error'   => self::$lastError,
+                'ok'           => false,
+                'engine'       => (string) ($engine ?? ''),
+                'engine_label' => self::engineLabel($engine),
+                'model'        => $model,
+                'seconds'      => $elapsed,
+                'words'        => 0,
+                'text'         => '',
+                'error'        => self::$lastError,
             ];
         }
 
         return [
-            'ok'      => true,
-            'model'   => $model,
-            'seconds' => $elapsed,
-            'words'   => str_word_count($text),
-            'text'    => substr($text, 0, 600),
-            'error'   => null,
+            'ok'           => true,
+            'engine'       => (string) $engine,
+            'engine_label' => self::engineLabel($engine),
+            'model'        => $model,
+            'seconds'      => $elapsed,
+            'words'        => str_word_count($text),
+            'text'         => substr($text, 0, 600),
+            'error'        => null,
         ];
     }
 
     /**
-     * @return array{binary:?string, version:?string, models_dir:string, model:string, model_file:string, model_exists:bool, ffmpeg:?string}
+     * @return array<string, mixed>
      */
     public static function diagnostics(): array
     {
         $model = self::defaultModel();
-        $path = self::modelFile($model);
+        $engine = self::engine();
+        $cppModel = self::modelFile($model);
+        $pyModel = self::openAiModelFile($model);
+
         return [
-            'binary'       => self::binary(),
-            'version'      => self::version(),
-            'models_dir'   => self::modelsDir(),
-            'model'        => $model,
-            'model_file'   => $path,
-            'model_exists' => is_file($path),
-            'ffmpeg'       => Ffmpeg::binary(),
+            'configured_engine' => self::configuredEngine(),
+            'engine'            => $engine,
+            'engine_label'      => self::engineLabel($engine),
+            'ready'             => self::ready($model),
+            'binary'            => self::activeBinary(),
+            'version'           => self::version(),
+            'models_dir'        => self::modelsDir(),
+            'model'             => $model,
+            'model_file'        => self::activeModelPath($model),
+            'model_exists'      => self::activeModelExists($model),
+            'language'          => self::language(),
+            'ffmpeg'            => Ffmpeg::binary(),
+            'cpp'               => [
+                'binary'       => self::cppBinary(),
+                'version'      => self::version(),
+                'model_file'   => $cppModel,
+                'model_exists' => is_file($cppModel),
+            ],
+            'openai'            => [
+                'binary'       => self::openAiBinary(),
+                'model_file'   => $pyModel,
+                'model_exists' => is_file($pyModel),
+                'language'     => self::language(),
+            ],
         ];
     }
 }
