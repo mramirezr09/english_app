@@ -35,10 +35,12 @@ final class SyncController extends Controller
             'whisperModels' => Config::WHISPER_MODELS,
             'logs'          => ProcessRunner::recentLogs(8),
             'prerequisites' => [
-                'ffmpeg'  => Ffmpeg::binary(),
-                'whisper' => Whisper::binary(),
-                'model'   => Whisper::modelFile(Whisper::defaultModel()),
-                'ready'   => Whisper::ready() && Ffmpeg::binary() !== null,
+                'ffmpeg'       => Ffmpeg::binary(),
+                'whisper'      => Whisper::activeBinary(),
+                'engine'       => Whisper::engineLabel(),
+                'model'        => Whisper::activeModelPath(Whisper::defaultModel()),
+                'model_exists' => Whisper::activeModelExists(Whisper::defaultModel()),
+                'ready'        => Whisper::ready() && Ffmpeg::binary() !== null,
             ],
             'status'        => $this->statusMessage((string) Request::query('status', '')),
         ]);
@@ -135,12 +137,10 @@ final class SyncController extends Controller
         if (Ffmpeg::binary() === null) {
             return 'ffmpeg_missing';
         }
-        if (Whisper::binary() === null) {
-            return 'whisper_missing';
-        }
         $model = $whisperModel ?: Whisper::defaultModel();
-        if (!is_file(Whisper::modelFile($model))) {
-            return 'whisper_model_missing';
+        $status = Whisper::missingStatus($model);
+        if ($status !== null) {
+            return $status;
         }
         return null;
     }
@@ -154,8 +154,8 @@ final class SyncController extends Controller
             'reset'               => 'Leccion reseteada exitosamente.',
             'php_missing'         => 'No se encontro el binario de PHP configurado (paths.php en ai_config.json).',
             'ffmpeg_missing'      => 'No se encontro ffmpeg. Configura la ruta en /settings o en FFMPEG_BIN.',
-            'whisper_missing'     => 'No se encontro whisper-cli. Descarga whisper.cpp y configura la ruta en /settings.',
-            'whisper_model_missing' => 'Falta el modelo ggml de Whisper. Revisa la seccion Whisper en /settings.',
+            'whisper_missing'     => 'No hay motor Whisper disponible. Instala whisper.cpp o el CLI de openai-whisper y configura el motor en /settings.',
+            'whisper_model_missing' => 'Falta el modelo ggml de whisper.cpp. Descargalo desde /settings o cambia el motor a openai-whisper.',
             default               => '',
         };
     }
