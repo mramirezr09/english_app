@@ -1,20 +1,22 @@
 {
-    "backend": "ollama",
+    "backend": "opencode",
     "paths": {
         "video_dir": "/ruta/a/tus/videos",
-        "python": "python3"
+        "php": "php"
     },
-    "ollama": {
-        "endpoint": "http://localhost:11434",
-        "model": "gemma4:31b-cloud",
-        "timeout": 300
-    },
-    "openclaw": {
-        "binary": "/ruta/a/openclaw",
-        "timeout": 300
+    "opencode": {
+        "binary": "",
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "timeout": 300,
+        "archive_sessions": true,
+        "service_port": 28994
     },
     "whisper": {
-        "model": "base"
+        "model": "base",
+        "english_only": true,
+        "binary": "",
+        "models_dir": "",
+        "ffmpeg": ""
     },
     "exam": {
         "passing_score": 80,
