@@ -42,4 +42,5 @@ return static function (Router $router): void {
     $router->get('/settings/models', [SettingsController::class, 'models']);
     $router->get('/settings/test-ai', [SettingsController::class, 'testAi']);
     $router->get('/settings/test-whisper', [SettingsController::class, 'testWhisper']);
+    $router->get('/settings/doctor', [SettingsController::class, 'doctor']);
 };
