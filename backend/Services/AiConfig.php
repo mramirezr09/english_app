@@ -8,28 +8,33 @@ use App\Core\Config;
 
 /**
  * Loads and persists config/ai_config.json.
+ *
+ * Secrets (OpenCode API key) and the selected model live in .env; the rest of
+ * the local settings stay in JSON. Environment values win over JSON.
  */
 final class AiConfig
 {
     public static function defaults(): array
     {
         return [
-            'backend' => 'ollama',
+            'backend' => 'opencode',
             'paths'   => [
-                'video_dir' => '/home/mauricio/.openclaw/workspace/ingles',
-                'python'    => 'python3',
+                'video_dir' => '',
+                'php'       => 'php',
             ],
-            'ollama'  => [
-                'endpoint' => 'http://localhost:11434',
-                'model'    => 'gemma4:31b-cloud',
-                'timeout'  => 300,
-            ],
-            'openclaw' => [
-                'binary'  => '/home/mauricio/.openclaw/tmp/agent-cli/openclaw',
-                'timeout' => 300,
+            'opencode' => [
+                'binary'           => '',
+                'model'            => 'opencode-go/deepseek-v4.1-flash',
+                'timeout'          => 300,
+                'archive_sessions' => true,
+                'service_port'     => 28994,
             ],
             'whisper' => [
-                'model' => 'base',
+                'model'        => 'base',
+                'english_only' => true,
+                'binary'       => '',
+                'models_dir'   => '',
+                'ffmpeg'       => '',
             ],
             'exam' => [
                 'passing_score' => 80,
@@ -61,16 +66,64 @@ final class AiConfig
     public static function videoDir(): string
     {
         $cfg = self::load();
-        return rtrim((string) ($cfg['paths']['video_dir'] ?? ''), '/');
+        return rtrim((string) ($cfg['paths']['video_dir'] ?? ''), "/\\");
     }
 
     /**
-     * Interpreter used for the Python workers. Configurable via paths.python.
+     * PHP CLI binary used to launch background workers.
      */
-    public static function pythonBinary(): string
+    public static function phpBinary(): string
     {
         $cfg = self::load();
-        $binary = trim((string) ($cfg['paths']['python'] ?? ''));
-        return $binary !== '' ? $binary : 'python3';
+        $binary = trim((string) ($cfg['paths']['php'] ?? ''));
+        if ($binary !== '') {
+            return $binary;
+        }
+        return PHP_OS_FAMILY === 'Windows' ? 'php.exe' : 'php';
+    }
+
+    /**
+     * Effective OpenCode model: .env wins, then ai_config.json.
+     */
+    public static function openCodeModel(): string
+    {
+        $fromEnv = trim((string) \App\Core\Env::get('OPENCODE_MODEL', ''));
+        if ($fromEnv !== '') {
+            return $fromEnv;
+        }
+        $cfg = self::load();
+        return trim((string) ($cfg['opencode']['model'] ?? ''));
+    }
+
+    public static function whisperModelsDir(): string
+    {
+        $fromEnv = trim((string) \App\Core\Env::get('WHISPER_MODELS_DIR', ''));
+        if ($fromEnv !== '') {
+            return self::absolutePath($fromEnv);
+        }
+        $cfg = self::load();
+        $configured = trim((string) ($cfg['whisper']['models_dir'] ?? ''));
+        return $configured !== '' ? self::absolutePath($configured) : Config::modelsDir();
+    }
+
+    /**
+     * Accept absolute paths, paths relative to the project root, and ~/ paths.
+     */
+    public static function absolutePath(string $path): string
+    {
+        $path = trim($path);
+        if ($path === '') {
+            return '';
+        }
+        if (str_starts_with($path, '~/') || str_starts_with($path, '~\\')) {
+            $home = (string) (getenv('HOME') ?: getenv('USERPROFILE') ?: '');
+            if ($home !== '') {
+                return rtrim($home, "/\\") . DIRECTORY_SEPARATOR . substr($path, 2);
+            }
+        }
+        if (preg_match('#^[A-Za-z]:[\\\\/]#', $path) === 1 || str_starts_with($path, '/')) {
+            return $path;
+        }
+        return Config::root() . DIRECTORY_SEPARATOR . ltrim($path, "/\\");
     }
 }
