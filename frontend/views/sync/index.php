@@ -23,11 +23,17 @@
         Suelta los nuevos <strong>.mp4</strong> en la carpeta de videos y recarga esta pagina: se detectan automaticamente. El boton procesa solo lo pendiente.
     </p>
     <p style="margin-bottom:15px; color:#666; font-size:0.9em;">
-        Requisitos:
+        Motor: <strong><?php echo htmlspecialchars((string) $prerequisites['engine']); ?></strong> /
         ffmpeg <?php echo $prerequisites['ffmpeg'] ? '&#9989;' : '&#10060;'; ?> /
-        whisper-cli <?php echo $prerequisites['whisper'] ? '&#9989;' : '&#10060;'; ?> /
+        binario <?php echo $prerequisites['whisper'] ? '&#9989;' : '&#10060;'; ?> /
         modelo <code><?php echo htmlspecialchars(basename((string) $prerequisites['model'])); ?></code>
-        <?php echo is_file((string) $prerequisites['model']) ? '&#9989;' : '&#10060;'; ?>
+        <?php if ($prerequisites['model_exists']): ?>
+            &#9989;
+        <?php elseif (str_starts_with((string) $prerequisites['engine'], 'openai')): ?>
+            <span style="color:#b8860b;">(se descargara al usar)</span>
+        <?php else: ?>
+            &#10060;
+        <?php endif; ?>
         <?php if (!$prerequisites['ready']): ?>
             <br><a href="/settings">Configurar en Ajustes</a>
         <?php endif; ?>
