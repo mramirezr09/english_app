@@ -45,15 +45,37 @@
     </div>
 
     <div class="content-section">
+        <h2>&#127908; Practica Oral</h2>
+        <p>La IA te hace preguntas sobre la leccion. Responde con el microfono y te dira
+           que se entendio bien, que palabras corregir y como.</p>
+        <label style="display:flex; align-items:center; gap:6px; margin:6px 0;">
+            <input type="checkbox" id="speech-tts" checked>
+            <span>Leer las preguntas en voz alta</span>
+        </label>
+        <div id="speech-warning" class="error" style="display:none; margin:10px 0;"></div>
+        <div class="actions">
+            <button class="btn" style="background:#e67e22" onclick="SpeechPractice.startConversation()">&#127908; Iniciar conversacion</button>
+            <button class="btn" id="speaking-skip" style="background:#34495e; display:none" onclick="SpeechPractice.skipQuestion()">Otra pregunta</button>
+        </div>
+        <div id="speaking-log" style="margin-top:15px; border:1px solid #ddd; padding:15px; border-radius:10px; background:#fefefe; max-height:420px; overflow-y:auto;" hidden></div>
+        <div id="speaking-controls" style="display:none; align-items:center; gap:10px; margin-top:10px;">
+            <button class="btn mic-btn" id="speaking-mic" onclick="SpeechPractice.talkMic(this)">&#127908; Responder</button>
+            <span id="speaking-status" style="color:#666;"></span>
+        </div>
+    </div>
+
+    <div class="content-section">
         <h2>&#9997;&#65039; Ejercicios</h2>
         <div class="exercise-box">
             <?php if ($exercises): ?>
                 <?php foreach ($exercises as $index => $ex): ?>
-                    <div class="exercise" data-answer="<?php echo htmlspecialchars($ex['answer'] ?? ''); ?>">
+                    <div class="exercise" data-answer="<?php echo htmlspecialchars($ex['answer'] ?? ''); ?>" data-question="<?php echo htmlspecialchars($ex['question'] ?? ''); ?>">
                         <p><?php echo ($index + 1) . '. ' . htmlspecialchars($ex['question'] ?? ''); ?></p>
                         <input type="text" id="ex_<?php echo $index; ?>" placeholder="Tu respuesta...">
                         <button class="btn" onclick="checkAnswer(<?php echo $index; ?>)">Verificar</button>
+                        <button type="button" class="btn mic-btn" style="background:#e67e22" onclick="SpeechPractice.exerciseMic(this, <?php echo $index; ?>)">&#127908; Responder con voz</button>
                         <span id="res_<?php echo $index; ?>"></span>
+                        <div class="speech-result" id="speech-result-<?php echo $index; ?>" hidden></div>
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
@@ -63,3 +85,4 @@
     </div>
 </div>
 <script src="/assets/js/lesson.js"></script>
+<script src="/assets/js/speech.js"></script>
