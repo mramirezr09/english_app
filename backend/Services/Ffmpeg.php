@@ -65,6 +65,21 @@ final class Ffmpeg
 
     public static function extractAudio(string $videoPath, string $wavPath, int $timeout = 3600): bool
     {
+        return self::toWav($videoPath, $wavPath, 'video', $timeout);
+    }
+
+    /**
+     * Convert a browser audio upload (webm/ogg/m4a/mp3...) to the 16 kHz mono
+     * WAV that Whisper expects. Same pipeline as extractAudio() but from audio
+     * instead of video, so short clips finish in well under a second.
+     */
+    public static function audioToWav(string $audioPath, string $wavPath, int $timeout = 120): bool
+    {
+        return self::toWav($audioPath, $wavPath, 'audio', $timeout);
+    }
+
+    private static function toWav(string $srcPath, string $wavPath, string $kindLabel, int $timeout): bool
+    {
         self::$lastError = null;
 
         $binary = self::binary();
@@ -72,15 +87,15 @@ final class Ffmpeg
             self::$lastError = 'No se encontro ffmpeg. Configura la ruta en Ajustes o en FFMPEG_BIN.';
             return false;
         }
-        if (!is_file($videoPath)) {
-            self::$lastError = 'No existe el video: ' . $videoPath;
+        if (!is_file($srcPath)) {
+            self::$lastError = 'No existe el ' . $kindLabel . ': ' . $srcPath;
             return false;
         }
 
         Config::ensureDirectory(dirname($wavPath));
 
         $result = Shell::run([
-            $binary, '-y', '-i', $videoPath, '-vn',
+            $binary, '-y', '-i', $srcPath, '-vn',
             '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
             $wavPath,
         ], null, $timeout);
