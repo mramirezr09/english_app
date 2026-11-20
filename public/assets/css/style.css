@@ -230,6 +230,45 @@ textarea.form-control { resize: vertical; min-height: 70px; }
     margin: 8px 0;
 }
 
+/* Speaking practice (mic buttons, word chips, feedback) */
+.mic-btn { background: #e67e22; }
+.mic-btn.recording { background: #e74c3c; animation: mic-pulse 1.2s ease-in-out infinite; }
+@keyframes mic-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+.exercise .mic-btn { margin-left: 6px; }
+.speech-result {
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #e2e8ec;
+    border-left: 4px solid #e67e22;
+}
+.speech-chips { line-height: 2.1; margin: 8px 0; }
+.chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.95em;
+    white-space: nowrap;
+}
+.chip-ok { background: #dcfce7; color: #166534; }
+.chip-wrong { background: #fef3c7; color: #92400e; }
+.chip-wrong small { color: #b45309; }
+.chip-missing { background: #fee2e2; color: #991b1b; text-decoration: line-through; }
+.chip-extra { background: #f1f5f9; color: #475569; font-style: italic; }
+.speech-feedback { line-height: 1.6; margin: 8px 0; }
+.speech-heard { color: #555; }
+.speech-note { color: #888; font-size: 0.85em; }
+.speech-issues { margin: 8px 0 8px 22px; padding: 0; }
+.speech-issues li { margin: 6px 0; line-height: 1.5; }
+.speech-issues em { color: #555; }
+.speech-teacher { background: #f5f5f5; padding: 8px; border-radius: 5px; margin: 6px 0; }
+.speech-you { background: #e1f5fe; padding: 8px; border-radius: 5px; margin: 6px 0; }
+#speaking-log .chip { margin: 2px 0; }
+
 @media (max-width: 640px) {
     body { padding: 12px; }
     h1 { font-size: 1.5em; }
