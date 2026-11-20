@@ -1,4 +1,11 @@
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [QSA,L]
+# Front controller: todas las rutas (/lessons/1, /api/..., /videos/...) entran
+# por index.php. Necesario al servir con Apache (usar php-fpm y HTTPS para que
+# el microfono de la practica oral funcione fuera de localhost).
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # No reescribir archivos reales (css/js) ni rutas de video existentes.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
