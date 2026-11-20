@@ -6,6 +6,7 @@ use App\Controllers\ExamController;
 use App\Controllers\HomeController;
 use App\Controllers\LessonController;
 use App\Controllers\SettingsController;
+use App\Controllers\SpeechController;
 use App\Controllers\SyncController;
 use App\Controllers\TutorController;
 use App\Controllers\VideoController;
@@ -23,6 +24,8 @@ return static function (Router $router): void {
     $router->get('/lessons/{id}/reset', [LessonController::class, 'reset']);
     $router->post('/api/lessons/{id}/complete', [LessonController::class, 'complete']);
     $router->post('/api/tutor', [TutorController::class, 'message']);
+    $router->post('/api/lessons/{id}/speech/evaluate', [SpeechController::class, 'evaluate']);
+    $router->post('/api/lessons/{id}/speech/question', [SpeechController::class, 'question']);
 
     $router->get('/exams', [ExamController::class, 'index']);
     $router->get('/exams/new', [ExamController::class, 'take']);
