@@ -4,7 +4,9 @@ Aplicacion web (PHP 8 + SQLite) que convierte videos de clase en lecciones
 interactivas: sincroniza los `.mp4`, los transcribe con **whisper.cpp** y los
 enriquece con IA (explicacion en espanol + 5 ejercicios), con tutor IA por
 leccion. Incluye una seccion de **examenes** autogenerados y corregidos en el
-servidor.
+servidor, y **practica oral con microfono**: la IA te hace preguntas, escucha
+tu respuesta (Whisper), te corrige palabra por palabra y te indica como
+mejorar la pronunciacion.
 
 Stack: PHP 8 (sin dependencias ni framework), SQLite, JavaScript vanilla,
 **ffmpeg**, **whisper.cpp** (o `openai-whisper` opcional como fallback) y el
@@ -72,11 +74,12 @@ backend/
   bootstrap.php               # Autoload PSR-4 + helpers + carga de .env
   routes.php                  # Tabla de rutas
   Core/                       # Router, Request, Response, View, Controller, Model, Config, Env
-  Controllers/                # Home, Lesson, Sync, Settings, Tutor, Video, Exam
+  Controllers/                # Home, Lesson, Sync, Settings, Tutor, Video, Exam, Speech
   Models/                     # Lesson, Exam (acceso a datos)
   Services/                   # AiConfig, AiService, OpenCode, Whisper, Ffmpeg, Shell,
                               #   Enricher, ExamGenerator, LessonPipeline, ProcessRunner,
-                              #   ExamBuilder, ExamGrader, ExamProcessor, Markdown
+                              #   ExamBuilder, ExamGrader, ExamProcessor, Markdown,
+                              #   SpeechEvaluator
   helpers/                    # str_limit (UTF-8)
   workers/                    # Workers PHP: process_lessons, enrich_lesson, generate_exam
 config/ai_config.json         # Configuracion local (rutas, timeouts, Whisper, examenes)
@@ -91,6 +94,7 @@ bin/setup.php                 # Crea la base de datos y todas las tablas
 bin/migrate_levels.php        # Prefija con el nivel las filas antiguas planas
 bin/migrate_exams.php         # Crea las tablas de examenes en bases existentes
 bin/doctor.php                # Diagnostico del entorno (PHP, binarios, .env, BD)
+bin/test_speech.php           # Verifica la transcripcion de voz (Whisper + ffmpeg) sin navegador
 bin/download-whisper-model.php# Descarga modelos ggml desde HuggingFace
 ```
 
@@ -112,6 +116,8 @@ bin/download-whisper-model.php# Descarga modelos ggml desde HuggingFace
 | `GET /lessons/{id}` | Detalle de la leccion (video, transcripcion, explicacion, ejercicios, tutor) |
 | `GET /videos/{ruta}` | Streaming del video desde `paths.video_dir` (soporta HTTP Range) |
 | `POST /api/lessons/{id}/complete` | Marca la leccion como completada |
+| `POST /api/lessons/{id}/speech/evaluate` | Practica oral: recibe el audio del microfono (multipart), transcribe con Whisper y corrige con IA |
+| `POST /api/lessons/{id}/speech/question` | Genera la pregunta de conversacion segun la leccion y el historial |
 | `GET /lessons/{id}/reset` | Resetea transcripcion/explicacion/ejercicios |
 | `POST /api/tutor` | Mensaje al tutor IA |
 | `GET /exams` | Panel de examenes (banco, niveles, intentos) |
@@ -138,7 +144,12 @@ bin/download-whisper-model.php# Descarga modelos ggml desde HuggingFace
    Solo se procesa lo pendiente; lo ya completado se omite.
 4. Elegir el modelo Whisper en el propio panel si se desea.
 5. Ver el resultado en `/lessons/{id}`: transcripcion, explicacion, ejercicios y tutor.
-6. Para examenes: abrir `/exams`, generar el banco con IA (por leccion o todas) y rendir
+6. Para practica oral: en la leccion, pulsar **Responder con voz** en un ejercicio o
+   **Iniciar conversacion** en "Practica Oral". Habla, detiene la grabacion y la app
+   transcribe tu audio con Whisper, compara palabra por palabra con la respuesta
+   esperada y la IA te explica en espanol que corregir. Requiere microfono y
+   **HTTPS o localhost** (limitacion del navegador, no de la app).
+7. Para examenes: abrir `/exams`, generar el banco con IA (por leccion o todas) y rendir
    un examen por leccion, por nivel o mixto.
 
 ## Configuracion
@@ -172,7 +183,8 @@ OPENCODE_MODEL=opencode-go/deepseek-v4.1-flash
 - `paths.php`: binario de PHP que lanzan los workers (default `php`).
 - `opencode.binary`, `opencode.timeout`, `opencode.archive_sessions`, `opencode.service_port`.
 - `whisper.engine` (`auto`, `whisper_cpp`, `openai_whisper`), `whisper.model`
-  (`tiny|base|small|medium|large-v3`), `whisper.language`, `whisper.english_only`,
+  (`tiny|base|small|medium|large-v3`), `whisper.speech_model` (modelo para la
+  practica oral; `tiny` responde mas rapido), `whisper.language`, `whisper.english_only`,
   `whisper.binary` (whisper.cpp), `whisper.openai_binary` (CLI de Python),
   `whisper.models_dir`, `whisper.ffmpeg`.
 - `exam.passing_score` (default 80) y `exam.questions` (default 12).
@@ -200,6 +212,7 @@ El comando de `openai-whisper` es el mismo que usaba el worker antiguo:
 php bin/doctor.php        # checks + resumen de la base
 php bin/doctor.php --ai   # ademas envia un READY por OpenCode
 php bin/doctor.php --json # salida para automatizar
+php bin/test_speech.php   # pipeline de voz: ffmpeg + Whisper sobre un clip corto
 ```
 
 Comprueba PHP y extensiones, `.env`, key, modelo, binario/version de OpenCode,
@@ -274,6 +287,59 @@ Los tres scripts son idempotentes (`CREATE TABLE/INDEX IF NOT EXISTS`).
    - `Regenerar IA` en una leccion ya transcrita (no toca la transcripcion).
    - Procesar **un** video pendiente.
    - Generar **un** examen y rendirlo.
+
+### Apache + HTTPS (practica oral)
+
+El navegador solo habilita el microfono en **contexto seguro** (`localhost` o
+HTTPS). Para practicar oral desde el celular u otra maquina de la red, sirve la
+app por HTTPS con Apache y PHP-FPM (esto ademas evita el bloqueo de `php -S`,
+que es de un solo proceso y congela el sitio mientras evalua un audio):
+
+```bash
+sudo apt install php8.2-fpm
+sudo a2enmod ssl rewrite proxy_fcgi headers
+sudo a2enconf php8.2-fpm
+
+# Certificado propio para uso en red local (aceptalo una vez en el navegador):
+sudo openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
+  -keyout /etc/apache2/ssl/english_app.key \
+  -out /etc/apache2/ssl/english_app.crt \
+  -subj "/CN=tu-host-o-ip" -addext "subjectAltName=IP:192.168.1.50,DNS:english.local"
+```
+
+```apache
+<VirtualHost *:443>
+    ServerName english.local
+    DocumentRoot /var/www/english_app/public
+
+    <Directory /var/www/english_app/public>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    SetHandler "proxy:unix:/run/php/php8.2-fpm.sock|fcgi://localhost"
+
+    SSLEngine on
+    SSLCertificateFile    /etc/apache2/ssl/english_app.crt
+    SSLCertificateKeyFile /etc/apache2/ssl/english_app.key
+
+    # El microfono debe estar permitido para la propia pagina.
+    Header always set Permissions-Policy "microphone=(self)"
+</VirtualHost>
+```
+
+El `AllowOverride All` activa `public/.htaccess` (front controller a
+`index.php`). Con dominio real, `sudo certbot --apache` evita el certificado
+propio. Verifica el pipeline de voz en el servidor sin navegador:
+
+```bash
+php bin/test_speech.php            # usa storage/tmp/lesson_audio.wav
+php bin/test_speech.php clip.webm  # o cualquier grabacion corta
+```
+
+Si `whisper.engine` resuelve a openai-whisper (Python), la practica oral
+funciona pero sin timings; con whisper.cpp se obtienen segmentos con tiempos
+en Windows y Ubuntu.
 
 ### systemd
 
