@@ -86,6 +86,8 @@ final class SettingsController extends Controller
 
         $whisperModel = trim((string) Request::post('whisper_model', $cfg['whisper']['model'] ?? 'base'));
         $cfg['whisper']['model'] = in_array($whisperModel, Config::WHISPER_MODELS, true) ? $whisperModel : 'base';
+        $speechModel = trim((string) Request::post('whisper_speech_model', $cfg['whisper']['speech_model'] ?? 'base'));
+        $cfg['whisper']['speech_model'] = in_array($speechModel, Config::WHISPER_MODELS, true) ? $speechModel : 'base';
         $whisperEngine = trim((string) Request::post('whisper_engine', $cfg['whisper']['engine'] ?? 'auto'));
         $cfg['whisper']['engine'] = in_array($whisperEngine, ['auto', 'whisper_cpp', 'openai_whisper'], true)
             ? $whisperEngine
