@@ -258,6 +258,17 @@ final class Whisper
         return in_array($model, Config::WHISPER_MODELS, true) ? $model : 'base';
     }
 
+    /**
+     * Model used for speaking practice. Short mic clips must answer in a few
+     * seconds, so this is configurable separately from the video pipeline.
+     */
+    public static function speechModel(): string
+    {
+        $cfg = AiConfig::load();
+        $model = trim((string) Env::get('WHISPER_SPEECH_MODEL', (string) ($cfg['whisper']['speech_model'] ?? 'base')));
+        return in_array($model, Config::WHISPER_MODELS, true) ? $model : 'base';
+    }
+
     public static function ready(?string $model = null): bool
     {
         $engine = self::engine();
@@ -444,6 +455,153 @@ final class Whisper
     }
 
     /**
+     * Transcription for speaking practice: same engines and models as
+     * transcribe(), but whisper.cpp is asked for its JSON output (-oj) so the
+     * result also carries per-segment timing. When the installed build emits
+     * per-word timings they are kept; otherwise word_timings is false and the
+     * caller aligns at text level. The Python engine only offers plain text,
+     * so it degrades to transcribe() transparently.
+     *
+     * @return array{text:string, engine:string, word_timings:bool, duration:float, segments:list<array{from:float, to:float, text:string}>}|null
+     */
+    public static function transcribeDetailed(string $audioPath, ?string $model = null, int $timeout = 120): ?array
+    {
+        self::$lastError = null;
+        $model = $model ?: self::speechModel();
+        $engine = self::engine();
+
+        if ($engine === 'whisper_cpp') {
+            return self::transcribeDetailedCpp($audioPath, $model, $timeout);
+        }
+
+        // openai-whisper (or no engine): plain text, no segment timing.
+        $text = self::transcribe($audioPath, $model, $timeout);
+        if ($text === null) {
+            return null;
+        }
+        return [
+            'text'         => $text,
+            'engine'       => (string) $engine,
+            'word_timings' => false,
+            'duration'     => 0.0,
+            'segments'     => [],
+        ];
+    }
+
+    /**
+     * @return array{text:string, engine:string, word_timings:bool, duration:float, segments:list<array{from:float, to:float, text:string}>}|null
+     */
+    private static function transcribeDetailedCpp(string $wavPath, string $model, int $timeout): ?array
+    {
+        $binary = self::cppBinary();
+        if ($binary === null) {
+            self::$lastError = 'No se encontro whisper-cli. Configura WHISPER_BIN o la ruta en Ajustes.';
+            return null;
+        }
+        if (!is_file($wavPath)) {
+            self::$lastError = 'No existe el audio: ' . $wavPath;
+            return null;
+        }
+
+        $modelPath = self::modelFile($model);
+        if (!is_file($modelPath)) {
+            self::$lastError = 'Falta el modelo ' . basename($modelPath) . '. Descargalo en ' . self::modelsDir()
+                . ' (' . self::modelUrl($model) . ').';
+            return null;
+        }
+
+        $outBase = Config::tmpDir() . DIRECTORY_SEPARATOR . 'whisper_d_' . md5($wavPath . $model . microtime(true));
+        $result = Shell::run(
+            [$binary, '-m', $modelPath, '-f', $wavPath, '-l', self::languageCode(), '-oj', '-np', '-of', $outBase],
+            null,
+            $timeout,
+            Config::tmpDir()
+        );
+
+        $jsonPath = $outBase . '.json';
+        $raw = is_file($jsonPath) ? (string) file_get_contents($jsonPath) : '';
+        @unlink($jsonPath);
+        @unlink($outBase . '.txt');
+
+        $decoded = json_decode($raw, true);
+        if ($result['timeout']) {
+            self::$lastError = 'Whisper (whisper.cpp) excedio el tiempo limite de ' . $timeout . ' s.';
+            return null;
+        }
+        if (!is_array($decoded)) {
+            $detail = trim($result['stderr']);
+            self::$lastError = 'whisper.cpp no genero JSON utilizable (exit ' . $result['exit'] . '). '
+                . (strlen($detail) > 800 ? substr($detail, -800) : $detail);
+            return null;
+        }
+
+        // whisper.cpp keeps the segments at the top level ("transcription") or
+        // nested under "result" depending on the build version.
+        $entries = $decoded['transcription'] ?? ($decoded['result']['transcription'] ?? null);
+        if (!is_array($entries)) {
+            self::$lastError = 'El JSON de whisper.cpp no trae transcripcion.';
+            return null;
+        }
+
+        $segments = [];
+        $wordTimings = false;
+        $texts = [];
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            [$from, $to] = self::segmentOffsets($entry);
+            $text = trim((string) ($entry['text'] ?? ''));
+            $text = trim($text, " \t\"");
+            if ($text === '') {
+                continue;
+            }
+            $segments[] = ['from' => $from, 'to' => $to, 'text' => $text];
+            $texts[] = $text;
+            if (is_array($entry['words'] ?? null) && $entry['words'] !== []) {
+                $wordTimings = true;
+            }
+        }
+
+        return [
+            'text'         => trim(implode(' ', $texts)),
+            'engine'       => 'whisper_cpp',
+            'word_timings' => $wordTimings,
+            'duration'     => $segments !== [] ? max(array_column($segments, 'to')) : 0.0,
+            'segments'     => $segments,
+        ];
+    }
+
+    /**
+     * Seconds [from, to] for a JSON segment: prefers the numeric "offsets"
+     * (milliseconds) and falls back to parsing "timestamps" ("00:00:12,760").
+     *
+     * @param array<string, mixed> $entry
+     * @return array{0:float, 1:float}
+     */
+    private static function segmentOffsets(array $entry): array
+    {
+        $offsets = $entry['offsets'] ?? null;
+        if (is_array($offsets) && isset($offsets['from'], $offsets['to'])) {
+            return [((float) $offsets['from']) / 1000, ((float) $offsets['to']) / 1000];
+        }
+
+        $parse = static function (mixed $value): float {
+            $value = (string) $value;
+            if (preg_match('/(\d+):(\d{2}):(\d{2})[,.](\d{3})/', $value, $m) === 1) {
+                return ((int) $m[1]) * 3600 + ((int) $m[2]) * 60 + (int) $m[3] + ((int) $m[4]) / 1000;
+            }
+            return 0.0;
+        };
+
+        $timestamps = is_array($entry['timestamps'] ?? null) ? $entry['timestamps'] : [];
+        return [
+            $parse($timestamps['from'] ?? null),
+            $parse($timestamps['to'] ?? null),
+        ];
+    }
+
+    /**
      * @return array{ok:bool, engine:string, engine_label:string, model:string, seconds:float, words:int, text:string, error:?string}
      */
     public static function test(string $model): array
@@ -511,6 +669,7 @@ final class Whisper
             'version'           => self::version(),
             'models_dir'        => self::modelsDir(),
             'model'             => $model,
+            'speech_model'      => self::speechModel(),
             'model_file'        => self::activeModelPath($model),
             'model_exists'      => self::activeModelExists($model),
             'language'          => self::language(),
