@@ -111,6 +111,15 @@ $storage = $diagnostics['storage'];
             <?php endforeach; ?>
         </select>
     </label>
+    <label class="field">Modelo para practica oral (voz):
+        <select name="whisper_speech_model" class="form-control">
+            <?php foreach ($whisperModels as $w): ?>
+                <option value="<?php echo $h($w); ?>" <?php echo $w === ($cfg['whisper']['speech_model'] ?? 'base') ? 'selected' : ''; ?>>
+                    <?php echo $h($w); ?><?php echo $w === 'tiny' ? ' (mas rapido, ideal para voz)' : ''; ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </label>
     <label class="field">Idioma del audio:
         <input type="text" name="whisper_language" class="form-control" value="<?php echo $h($cfg['whisper']['language'] ?? 'English'); ?>" placeholder="English">
     </label>
