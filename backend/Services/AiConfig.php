@@ -32,6 +32,7 @@ final class AiConfig
             'whisper' => [
                 'engine'        => 'auto',
                 'model'         => 'base',
+                'speech_model'  => 'base',
                 'language'      => 'English',
                 'english_only'  => true,
                 'binary'        => '',
