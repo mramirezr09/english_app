@@ -47,12 +47,30 @@ Documentacion del proyecto en `README.md`. Aca se registra lo implementado y lo 
       `storage/bin`, `storage/models` y `storage/runtime` ya no estan en git.
 - [x] Motor de Whisper seleccionable: `auto`, `whisper.cpp` nativo u
       `openai-whisper` (Python) para reutilizar instalaciones existentes.
+- [x] Practica oral con microfono: los ejercicios y una seccion de conversacion
+      preguntan al alumno, `MediaRecorder` graba, ffmpeg convierte, Whisper
+      (`transcribeDetailed`, `-oj` con tiempos por segmento) transcribe y una
+      alineacion por palabra + IA devuelven correccion en espanol con score,
+      marcado ok/mal/faltante y siguientes preguntas. Endpoints
+      `POST /api/lessons/{id}/speech/{evaluate,question}`, estado de la
+      conversacion solo en el navegador (como el tutor), sin tablas nuevas.
+- [x] `bin/test_speech.php`: valida el pipeline de voz por CLI (Windows/Ubuntu).
+- [x] Configurable `whisper.speech_model` (modelo Whisper para voz) y campo en
+      `/settings`; TTS del navegador para leer las preguntas.
+- [x] `public/.htaccess` + seccion Apache/HTTPS en el README (el microfono
+      requiere contexto seguro: localhost o TLS).
 - [x] Eliminado el backend Python/Ollama/OpenClaw del flujo principal: la IA es
       nativa y la transcripcion usa whisper.cpp; openai-whisper queda como
       fallback opcional configurable.
 
 ## Pendiente
 
+- [ ] Probar la practica oral en navegador real con microfono (Chrome/Edge en
+      localhost y Safari iOS via HTTPS): el pipeline server-side ya esta
+      validado con `bin/test_speech.php` y uploads simulados.
+- [ ] Opcional: pronunciacion a nivel fonema (forzador de alineacion `-dtw` de
+      whisper.cpp o modelo de scoring aparte). Hoy la senal fonetica es
+      indirecta: palabra esperada vs. transcripcion de Whisper.
 - [ ] Correr `php bin/migrate_exams.php` en el deploy (o automatizarlo en `start_server.sh`).
 - [ ] Boton "Generar examen" por leccion dentro de `/sync`.
 - [ ] Corregir los ejercicios de la leccion en el servidor (hoy la respuesta viaja en el
